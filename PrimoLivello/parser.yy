@@ -120,7 +120,7 @@ idseq:
 %left "+" "-";
 %left "*" "/";
 
-//new 
+//dubbio: perché in tutte le produzioni "cicliche" hai l'ordine al contrario rispetto a questo? 
 stmts:
   stmt                  { std::vector<StmtAST*> statements;
                           statements.push_back($1);
