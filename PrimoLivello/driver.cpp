@@ -320,8 +320,8 @@ Value* BlockExprAST::codegen(driver& drv) {
 };
 
 /************************* Var binding Tree *************************/
-VarBindingAST::VarBindingAST(const std::string Name, ExprAST* Val):
-   Name(Name), Val(Val) {};
+VarBindingAST::VarBindingAST(const std::string Name, ExprAST* Val, bool newBinding = true):
+   Name(Name), Val(Val), newBinding(true) {};
    
 const std::string& VarBindingAST::getName() const { 
    return Name; 

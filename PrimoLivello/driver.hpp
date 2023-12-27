@@ -149,8 +149,9 @@ class VarBindingAST: public RootAST {
 private:
   const std::string Name;
   ExprAST* Val;
+  bool newBinding; 
 public:
-  VarBindingAST(const std::string Name, ExprAST* Val);
+  VarBindingAST(const std::string Name, ExprAST* Val, bool newBinding = true);
   AllocaInst *codegen(driver& drv) override;
   const std::string& getName() const;
 };
