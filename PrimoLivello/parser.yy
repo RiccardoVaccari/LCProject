@@ -19,8 +19,11 @@
   class FunctionAST;
   class SeqAST;
   class PrototypeAST;
-  class BlockExprAST;
+  class BlockAST;
   class VarBindingAST;
+  class StmtAST;
+  class AssignmentAST;
+  class GlobalVarAST;
 }
 
 // The parsing context.
@@ -62,6 +65,7 @@
 %token <std::string> IDENTIFIER "id"
 %token <double> NUMBER "number"
 %type <ExprAST*> exp
+%type <ExprAST*> initexp
 %type <ExprAST*> idexp
 %type <ExprAST*> expif
 %type <ExprAST*> condexp
@@ -73,20 +77,19 @@
 %type <PrototypeAST*> external
 %type <PrototypeAST*> proto
 %type <std::vector<std::string>> idseq
-%type <BlockExprAST*> blockexp
+%type <BlockAST*> block
 %type <std::vector<VarBindingAST*>> vardefs
 %type <VarBindingAST*> binding
 %type <GlobalVarAST*> globalvar
 %type <std::vector<StmtAST*>> stmts
 %type <StmtAST*> stmt
-%type <VarBindingAST*> assignment
-
+%type <AssignmentAST*> assignment
 
 %%
 %start startsymb;
 
 startsymb:
-program                 { drv.root = $1; }
+program                 { drv.root = $1; };
 
 program:
   %empty                { $$ = new SeqAST(nullptr,nullptr); }
@@ -96,7 +99,7 @@ top:
 %empty                  { $$ = nullptr; }
 | definition            { $$ = $1; }
 | external              { $$ = $1; }
-| globalvar             { $$ = $1 }; //!
+| globalvar             { $$ = $1; };
 
 definition:
   "def" proto block     { $$ = new FunctionAST($2,$3); $2->noemit(); }; //!
@@ -108,7 +111,7 @@ proto:
   "id" "(" idseq ")"    { $$ = new PrototypeAST($1,$3);  };
 
 globalvar:
-  "global" "id"         { $$ = new GlobalVarAST($2)}; //modify (new prod)
+  "global" "id"         { $$ = new GlobalVarAST($2); }; //modify (new prod)
 
 idseq:
   %empty                { std::vector<std::string> args;
@@ -120,36 +123,34 @@ idseq:
 %left "+" "-";
 %left "*" "/";
 
-//dubbio: perché in tutte le produzioni "cicliche" hai l'ordine al contrario rispetto a questo? 
 stmts:
   stmt                  { std::vector<StmtAST*> statements;
                           statements.push_back($1);
                           $$ = statements; }
 | stmt ";" stmts        { $3.push_back($1);
-                          $$ = $3; }
+                          $$ = $3; };
 
 stmt:
-  assignment            { $$ = $1 }
-| block                 { $$ = $1}
-| exp                   { $$ = $1 };
+  assignment            { $$ = $1; }
+| block                 { $$ = $1; }
+| exp                   { $$ = $1; };
 
 assignment:
- "id" "=" exp           {$$ = new VarBindingAST($1, $3, false)};
+ "id" "=" exp           {$$ = new AssignmentAST($1, $3); }; 
 
 block:
-  "{" stmts "}"             { $$ = $2 }
-  "{" vardefs ";" stmts "}" { $$ = new BlockExprAST($2,$4); } 
+  "{" stmts "}"             { $$ = new BlockAST($2); } //creare un costruttore con un solo pmt
+| "{" vardefs ";" stmts "}" { $$ = new BlockAST($2,$4); };
 
 vardefs:
-  binding                 { std::vector<VarBindingAST*> definitions;
-                            definitions.push_back($1);
-                            $$ = definitions; }
-| vardefs ";" binding     { $1.push_back($3);
-                            $$ = $1; }
+  binding               { std::vector<VarBindingAST*> definitions;
+                          definitions.push_back($1);
+                          $$ = definitions; }
+| vardefs ";" binding   { $1.push_back($3); $$ = $1; };
 
 binding:
-  "var" "id" initexp { $$ = new VarBindingAST($2,$3); }
-
+  "var" "id" initexp    { $$ = new VarBindingAST($2,$3); };
+                    
 exp:
   exp "+" exp           { $$ = new BinaryExprAST('+',$1,$3); }
 | exp "-" exp           { $$ = new BinaryExprAST('-',$1,$3); }
@@ -158,18 +159,18 @@ exp:
 | idexp                 { $$ = $1; }
 | "(" exp ")"           { $$ = $2; }
 | "number"              { $$ = new NumberExprAST($1); }
-| expif                 { $$ = $1; }
+| expif                 { $$ = $1; };
 
 initexp: 
-  %empty
-| "=" exp               { $$ = $2 }
+  %empty                { $$ = nullptr; }
+| "=" exp               { $$ = $2; };
 
 expif:
-  condexp "?" exp ":" exp { $$ = new IfExprAST($1,$3,$5); }
+  condexp "?" exp ":" exp { $$ = new IfExprAST($1,$3,$5); };
 
 condexp:
   exp "<" exp           { $$ = new BinaryExprAST('<',$1,$3); }
-| exp "==" exp          { $$ = new BinaryExprAST('=',$1,$3); }
+| exp "==" exp          { $$ = new BinaryExprAST('=',$1,$3); };
 
 idexp:
   "id"                  { $$ = new VariableExprAST($1); }

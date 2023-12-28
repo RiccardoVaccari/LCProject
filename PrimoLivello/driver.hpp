@@ -74,14 +74,17 @@ public:
   Value *codegen(driver& drv) override;
 };
 
+/// StmtAST - Classe base per tutti i nodi statement
+class StmtAST : public RootAST {};
+
 /// ExprAST - Classe base per tutti i nodi espressione
-class ExprAST : public RootAST {};
+class ExprAST : public StmtAST {};
 
 /// NumberExprAST - Classe per la rappresentazione di costanti numeriche
 class NumberExprAST : public ExprAST {
 private:
   double Val;
-
+  
 public:
   NumberExprAST(double Val);
   lexval getLexVal() const override;
@@ -134,13 +137,14 @@ public:
   Value *codegen(driver& drv) override;
 };
 
-/// BlockExprAST
-class BlockExprAST : public ExprAST {
+/// BlockAST
+class BlockAST : public StmtAST {
 private:
   std::vector<VarBindingAST*> Def;
-  ExprAST* Val;
+  std::vector<StmtAST*> Stmts;
 public:
-  BlockExprAST(std::vector<VarBindingAST*> Def, ExprAST* Val);
+  BlockAST(std::vector<VarBindingAST*> Def, std::vector<StmtAST*> Stmts);
+  BlockAST(std::vector<StmtAST*> Stmts);
   Value *codegen(driver& drv) override;
 }; 
 
@@ -149,9 +153,8 @@ class VarBindingAST: public RootAST {
 private:
   const std::string Name;
   ExprAST* Val;
-  bool newBinding; 
 public:
-  VarBindingAST(const std::string Name, ExprAST* Val, bool newBinding = true);
+  VarBindingAST(const std::string Name, ExprAST* Val);
   AllocaInst *codegen(driver& drv) override;
   const std::string& getName() const;
 };
@@ -177,12 +180,33 @@ public:
 class FunctionAST : public RootAST {
 private:
   PrototypeAST* Proto;
-  ExprAST* Body;
+  StmtAST* Body;
   bool external;
   
 public:
-  FunctionAST(PrototypeAST* Proto, ExprAST* Body);
+  FunctionAST(PrototypeAST* Proto, StmtAST* Body);
   Function *codegen(driver& drv) override;
+};
+
+class GlobalVarAST : public RootAST {
+  private:
+    std::string Name;
+  public:
+    GlobalVarAST(std::string Name);
+    AllocaInst *codegen(driver& drv) override;
+    //Value *codegen(driver& drv) override;
+    //Function *codegen(driver& drv) override;  
+};
+
+class AssignmentAST : public StmtAST {
+private:
+  const std::string Name;
+  ExprAST* AssignExpr;
+
+public:
+  AssignmentAST(const std::string Name, ExprAST* AssignExpr);
+  Value *codegen(driver& drv) override;
+  const std::string& getName() const;
 };
 
 #endif // ! DRIVER_HH
