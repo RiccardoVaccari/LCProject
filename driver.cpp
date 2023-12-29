@@ -529,16 +529,11 @@ Function *FunctionAST::codegen(driver &drv)
 GlobalVarAST::GlobalVarAST(const std::string Name) : Name(Name){};
 
 GlobalVariable *GlobalVarAST::codegen(driver &drv){
-  fprintf(stdout, "\nVariabile globale creata\n");
-  GlobalVariable *globVar = new GlobalVariable(*module, Type::getDoubleTy(*context), false, GlobalValue::CommonLinkage, ConstantFP::get(Type::getDoubleTy(*context), 0.0), Name);
+
+  GlobalVariable *globVar = new GlobalVariable(*module, Type::getDoubleTy(*context), false, GlobalValue::CommonLinkage,  ConstantFP::get(Type::getDoubleTy(*context), 0.0), Name);
   globVar->print(errs());
   fprintf(stderr, "\n");
-
-  Value* A = module->getNamedGlobal(Name);
-  if(!A)
-    fprintf(stdout, "Variabile non definita");
-  else
-    fprintf(stdout, "Variabile globale verificata\n");
+  
   return globVar;
 }
 
@@ -547,7 +542,6 @@ AssignmentAST::AssignmentAST(std::string Name, ExprAST *AssignExpr) : Name(Name)
 
 Value *AssignmentAST::codegen(driver &drv)
 {
-
   Value *A = drv.NamedValues[Name];
   if (!A){
     A = module->getNamedGlobal(Name);

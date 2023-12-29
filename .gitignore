@@ -14,3 +14,13 @@ parser*
 
 scanner*
 !scanner.ll
+
+
+floor*
+!floor.k
+rand*
+!rand.k
+callrand*
+!callrand.cpp
+callfloor*
+!callfloor.cpp
