@@ -127,7 +127,7 @@ stmts:
   stmt                  { std::vector<StmtAST*> statements;
                           statements.push_back($1);
                           $$ = statements; }
-| stmt ";" stmts        { $3.push_back($1);
+| stmt ";" stmts        { $3.insert($3.begin(), $1);
                           $$ = $3; };
 
 stmt:

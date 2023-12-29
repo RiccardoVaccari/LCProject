@@ -2,6 +2,8 @@
 
 Makefile
 
+.vscode/
+
 driver*
 !driver.cpp
 !driver.hpp
