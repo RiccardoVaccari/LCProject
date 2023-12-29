@@ -10,6 +10,6 @@ def randk() {
 def randinit(x) {
    a = 16897.0;
    m = 2147483647.0;
-   seed = x-m*floor(x/m);
+   seed = x-m*2;
    0.0
 };
