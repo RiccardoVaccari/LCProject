@@ -190,12 +190,12 @@ public:
 
 class GlobalVarAST : public RootAST {
   private:
-    std::string Name;
+    const std::string Name;
   public:
-    GlobalVarAST(std::string Name);
-    AllocaInst *codegen(driver& drv) override;
+    GlobalVarAST(const std::string Name);
+    GlobalVariable *codegen(driver& drv) override;
     //Value *codegen(driver& drv) override;
-    //Function *codegen(driver& drv) override;  
+    // Function *codegen(driver& drv) override;  
 };
 
 class AssignmentAST : public StmtAST {

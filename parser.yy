@@ -111,7 +111,7 @@ proto:
   "id" "(" idseq ")"    { $$ = new PrototypeAST($1,$3);  };
 
 globalvar:
-  "global" "id"         { $$ = new GlobalVarAST($2); }; //modify (new prod)
+  "global" "id"         { $$ = new GlobalVarAST($2); }; 
 
 idseq:
   %empty                { std::vector<std::string> args;

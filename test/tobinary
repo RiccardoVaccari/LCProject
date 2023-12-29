@@ -1,0 +1,14 @@
+#!/bin/bash
+
+fn=${1%.*}
+
+llvm-as-17 $1
+llc-17 ${fn}.bc
+as -o ${fn}.o ${fn}.s
+
+if [ "$#" -eq 2 ]; then 
+	echo "ciao"
+	fn1=${2%.*}
+	clang++-17 -c $2
+	clang++-17 -o ${fn} ${fn1}.o ${fn}.o
+fi
