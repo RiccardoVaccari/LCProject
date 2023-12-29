@@ -1,0 +1,13 @@
+#!/bin/bash
+
+fn=${1%.*}
+
+llvm-as $1
+llc ${fn}.bc
+as -o ${fn}.o ${fn}.s
+
+if [ "$#" -eq 2 ]; then 
+	fn1=${2%.*}
+	clang++ -c $2
+	clang++ -o ${fn} ${fn1}.o ${fn}.o
+fi

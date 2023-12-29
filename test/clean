@@ -1,0 +1,6 @@
+#!/bin/bash
+
+rm *.o
+rm *.ll
+rm *.bc
+rm *.s
