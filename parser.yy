@@ -24,6 +24,8 @@
   class StmtAST;
   class AssignmentAST;
   class GlobalVarAST;
+  class IfStmtAST;
+  class ForStmtAST;
 }
 
 // The parsing context.
@@ -60,6 +62,9 @@
   DEF        "def"
   VAR        "var"
   GLOBAL     "global"
+  IF         "if"
+  ELSE       "else"
+  FOR        "for"
 ;
 
 %token <std::string> IDENTIFIER "id"
@@ -84,6 +89,12 @@
 %type <std::vector<StmtAST*>> stmts
 %type <StmtAST*> stmt
 %type <AssignmentAST*> assignment
+%type <IfStmtAST*> ifstmt
+%type <ForStmtAST*> forstmt
+%type <RootAST*> init
+//non so cosa mettere a init come type perchè può essere
+//binding -> varBinding -> deriva da Root
+//assignment -> Assignment -> deriva da Stmt che deriva da Root
 
 %%
 %start startsymb;
@@ -133,13 +144,15 @@ stmts:
 stmt:
   assignment            { $$ = $1; }
 | block                 { $$ = $1; }
+| ifstmt                { $$ = $1; } //NEW
+| forstmt               { $$ = $1; } //NEW
 | exp                   { $$ = $1; };
 
 assignment:
  "id" "=" exp           {$$ = new AssignmentAST($1, $3); }; 
 
 block:
-  "{" stmts "}"             { $$ = new BlockAST($2); } //creare un costruttore con un solo pmt
+  "{" stmts "}"             { $$ = new BlockAST($2); }
 | "{" vardefs ";" stmts "}" { $$ = new BlockAST($2,$4); };
 
 vardefs:
@@ -188,6 +201,21 @@ explist:
                         }
 | exp "," explist       { $3.insert($3.begin(), $1); $$ = $3; };
  
+//********NEW********
+%right "else" ")";
+
+ifstmt:
+  "if" "(" condexp ")" stmt                          { $$ = new IfStmtAST($3, $5); }
+| "if" "(" condexp ")" stmt "else" stmt              { $$ = new IfStmtAST($3, $5, $7); };
+
+forstmt:
+  "for" "(" init ";" condexp ";" assignment ")" stmt { $$ = new ForStmtAST($3, $5, $7, $9)};
+
+init: 
+  binding     { $$ = $1; }
+| assignment  { $$ = $1; };
+
+//*******************
 %%
 
 void

@@ -209,6 +209,16 @@ public:
   const std::string& getName() const;
 };
 
-//ciao
+
+class IfStmtAST : public StmtAST {
+  private:
+    BinaryExprAST* CondExpr;
+    StmtAST* TrueStmt, ElseStmt;
+  public: 
+    IfStmtAST(BinaryExprAST* CondExpr, StmtAST* TrueStmt);
+    IfStmtAST(BinaryExprAST* CondExpr, StmtAST* TrueStmt, StmtAST* ElseStmt);
+    Value *codegen(driver& drv) override;
+}
+
 
 #endif // ! DRIVER_HH
