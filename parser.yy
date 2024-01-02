@@ -25,7 +25,7 @@
   class AssignmentAST;
   class GlobalVarAST;
   class IfStmtAST;
-  class ForStmtAST;
+  // class ForStmtAST;
 }
 
 // The parsing context.
@@ -54,6 +54,7 @@
   QMARK	     "?"
   COLON      ":"
   LT         "<"
+  GT         ">"
   EQ         "=="
   ASSIGN     "="
   LBRACE     "{"
@@ -64,7 +65,7 @@
   GLOBAL     "global"
   IF         "if"
   ELSE       "else"
-  FOR        "for"
+  /* FOR        "for" */
 ;
 
 %token <std::string> IDENTIFIER "id"
@@ -90,7 +91,7 @@
 %type <StmtAST*> stmt
 %type <AssignmentAST*> assignment
 %type <IfStmtAST*> ifstmt
-%type <ForStmtAST*> forstmt
+/* %type <ForStmtAST*> forstmt */
 %type <RootAST*> init
 //non so cosa mettere a init come type perchè può essere
 //binding -> varBinding -> deriva da Root
@@ -130,7 +131,7 @@ idseq:
 | "id" idseq            { $2.insert($2.begin(),$1); $$ = $2; };
 
 %left ":";
-%left "<" "==";
+%left "<" ">" "==";
 %left "+" "-";
 %left "*" "/";
 
@@ -145,7 +146,7 @@ stmt:
   assignment            { $$ = $1; }
 | block                 { $$ = $1; }
 | ifstmt                { $$ = $1; } //NEW
-| forstmt               { $$ = $1; } //NEW
+/* | forstmt               { $$ = $1; } //NEW */
 | exp                   { $$ = $1; };
 
 assignment:
@@ -183,6 +184,7 @@ expif:
 
 condexp:
   exp "<" exp           { $$ = new BinaryExprAST('<',$1,$3); }
+| exp ">" exp           { $$ = new BinaryExprAST('>',$1,$3); }
 | exp "==" exp          { $$ = new BinaryExprAST('=',$1,$3); };
 
 idexp:
@@ -207,13 +209,6 @@ explist:
 ifstmt:
   "if" "(" condexp ")" stmt                          { $$ = new IfStmtAST($3, $5); }
 | "if" "(" condexp ")" stmt "else" stmt              { $$ = new IfStmtAST($3, $5, $7); };
-
-forstmt:
-  "for" "(" init ";" condexp ";" assignment ")" stmt { $$ = new ForStmtAST($3, $5, $7, $9)};
-
-init: 
-  binding     { $$ = $1; }
-| assignment  { $$ = $1; };
 
 //*******************
 %%

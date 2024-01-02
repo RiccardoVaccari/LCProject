@@ -16,14 +16,7 @@ parser*
 !parser.yy
 
 scanner*
+*.ll
 !scanner.ll
 
-
-floor*
-!floor.k
-rand*
-!rand.k
-callrand*
-!callrand.cpp
-callfloor*
-!callfloor.cpp
+*.o

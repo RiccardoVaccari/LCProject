@@ -116,9 +116,10 @@ lexval VariableExprAST::getLexVal() const
 Value *VariableExprAST::codegen(driver &drv)
 {
   AllocaInst *A = drv.NamedValues[Name];
-  if (!A){
-    GlobalVariable* gVar = module->getNamedGlobal(Name);
-    if(gVar != nullptr)
+  if (!A)
+  {
+    GlobalVariable *gVar = module->getNamedGlobal(Name);
+    if (gVar != nullptr)
       return builder->CreateLoad(gVar->getValueType(), gVar, Name);
     else
       return LogErrorV("Variabile " + Name + " non definita");
@@ -151,6 +152,8 @@ Value *BinaryExprAST::codegen(driver &drv)
     return builder->CreateFDiv(L, R, "addres");
   case '<':
     return builder->CreateFCmpULT(L, R, "lttest");
+  case '>':
+    return builder->CreateFCmpUGT(L, R, "gttest");
   case '=':
     return builder->CreateFCmpUEQ(L, R, "eqtest");
   default:
@@ -528,12 +531,13 @@ Function *FunctionAST::codegen(driver &drv)
 /************************* GlobalVarAST **************************/
 GlobalVarAST::GlobalVarAST(const std::string Name) : Name(Name){};
 
-GlobalVariable *GlobalVarAST::codegen(driver &drv){
+GlobalVariable *GlobalVarAST::codegen(driver &drv)
+{
 
-  GlobalVariable *globVar = new GlobalVariable(*module, Type::getDoubleTy(*context), false, GlobalValue::CommonLinkage,  ConstantFP::get(Type::getDoubleTy(*context), 0.0), Name);
+  GlobalVariable *globVar = new GlobalVariable(*module, Type::getDoubleTy(*context), false, GlobalValue::CommonLinkage, ConstantFP::get(Type::getDoubleTy(*context), 0.0), Name);
   globVar->print(errs());
   fprintf(stderr, "\n");
-  
+
   return globVar;
 }
 
@@ -543,12 +547,13 @@ AssignmentAST::AssignmentAST(std::string Name, ExprAST *AssignExpr) : Name(Name)
 Value *AssignmentAST::codegen(driver &drv)
 {
   Value *A = drv.NamedValues[Name];
-  if (!A){
+  if (!A)
+  {
     A = module->getNamedGlobal(Name);
-    if(!A)
+    if (!A)
       return LogErrorV("Variabile " + Name + " non definita");
   }
-  
+
   Value *RHS = AssignExpr->codegen(drv);
   if (!RHS)
     return nullptr;
@@ -556,8 +561,73 @@ Value *AssignmentAST::codegen(driver &drv)
   builder->CreateStore(RHS, A);
   return RHS;
 }
-
+// Controllare se serve o meno il getName()
 const std::string &AssignmentAST::getName() const
 {
   return Name;
 };
+
+/************************* IfStmtAST **************************/
+IfStmtAST::IfStmtAST(ExprAST *CondExpr, StmtAST *TrueStmt, StmtAST *ElseStmt) : CondExpr(CondExpr), TrueStmt(TrueStmt), ElseStmt(ElseStmt){};
+
+Value *IfStmtAST::codegen(driver &drv)
+{
+  Value *CondV = CondExpr->codegen(drv);
+  if (!CondV)
+    return nullptr;
+
+  int NumReservedValues = 1;
+  Function *function = builder->GetInsertBlock()->getParent();
+  BasicBlock *TrueBB = BasicBlock::Create(*context, "truestmt", function);
+
+  BasicBlock *FalseBB;
+  if (ElseStmt)
+  {
+    FalseBB = BasicBlock::Create(*context, "elsestmt");
+    NumReservedValues++;
+  }
+
+  BasicBlock *MergeBB = BasicBlock::Create(*context, "endstmt");
+
+  if (ElseStmt)
+    builder->CreateCondBr(CondV, TrueBB, FalseBB);
+  else
+    builder->CreateCondBr(CondV, TrueBB, MergeBB);
+
+  builder->SetInsertPoint(TrueBB);
+  Value *TrueV = TrueStmt->codegen(drv);
+  if (!TrueV)
+    return nullptr;
+  builder->CreateBr(MergeBB);
+
+  TrueBB = builder->GetInsertBlock();
+  if (ElseStmt)
+    function->insert(function->end(), FalseBB);
+  else
+    function->insert(function->end(), MergeBB);
+
+  Value *FalseV;
+  if (ElseStmt)
+  {
+    builder->SetInsertPoint(FalseBB);
+
+    FalseV = ElseStmt->codegen(drv);
+    if (!FalseV)
+      return nullptr;
+    builder->CreateBr(MergeBB);
+
+    FalseBB = builder->GetInsertBlock();
+    function->insert(function->end(), MergeBB);
+  }
+
+  builder->SetInsertPoint(MergeBB);
+
+  PHINode *PN = builder->CreatePHI(Type::getDoubleTy(*context), NumReservedValues, "condval");
+  PN->addIncoming(TrueV, TrueBB);
+  if (ElseStmt)
+    PN->addIncoming(FalseV, FalseBB);
+
+  return PN;
+};
+
+/************************* ForStmtAST **************************/

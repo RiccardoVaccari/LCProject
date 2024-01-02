@@ -194,8 +194,6 @@ class GlobalVarAST : public RootAST {
   public:
     GlobalVarAST(const std::string Name);
     GlobalVariable *codegen(driver& drv) override;
-    //Value *codegen(driver& drv) override;
-    // Function *codegen(driver& drv) override;  
 };
 
 class AssignmentAST : public StmtAST {
@@ -211,14 +209,23 @@ public:
 
 
 class IfStmtAST : public StmtAST {
-  private:
-    BinaryExprAST* CondExpr;
-    StmtAST* TrueStmt, ElseStmt;
-  public: 
-    IfStmtAST(BinaryExprAST* CondExpr, StmtAST* TrueStmt);
-    IfStmtAST(BinaryExprAST* CondExpr, StmtAST* TrueStmt, StmtAST* ElseStmt);
-    Value *codegen(driver& drv) override;
-}
+private:
+  ExprAST* CondExpr;
+  StmtAST* TrueStmt;
+  StmtAST* ElseStmt;
+public: 
+  IfStmtAST(ExprAST* CondExpr, StmtAST* TrueStmt, StmtAST* ElseStmt = nullptr);
+  Value *codegen(driver& drv) override;
+};
 
+// class ForStmtAST : public StmtAST {
+//     private:
+//       RootAST* InitExp;
+//       BinaryExprAST* CondExpr;
+//       AssignmentAST* AssignExpr;
+//       StmtAST* BodyStmt;
+//     public: 
+//       ForStmtAST(RootAST* InitExp, BinaryExprAST* CondExpr, AssignmentAST* AssignExpr, StmtAST* BodyStmt);
+// };
 
 #endif // ! DRIVER_HH

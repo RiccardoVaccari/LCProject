@@ -1,0 +1,4 @@
+forstmt:
+  "for" "(" init ";" condexp ";" assignment ")" stmt { $$ = new ForStmtAST($3, $5, $7, $9)};
+
+"for"    { return yy::parser::make_FOR(loc); }
