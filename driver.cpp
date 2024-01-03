@@ -551,7 +551,7 @@ Value *AssignmentAST::codegen(driver &drv)
   {
     A = module->getNamedGlobal(Name);
     if (!A)
-      return LogErrorV("Variabile " + Name + " non definita");
+      return LogErrorV("Variabile " + Name + " non definita*");
   }
 
   Value *RHS = AssignExpr->codegen(drv);
@@ -572,20 +572,19 @@ IfStmtAST::IfStmtAST(ExprAST *CondExpr, StmtAST *TrueStmt, StmtAST *ElseStmt) : 
 
 Value *IfStmtAST::codegen(driver &drv)
 {
+  BasicBlock *entryBB = builder->GetInsertBlock();
+
   Value *CondV = CondExpr->codegen(drv);
   if (!CondV)
     return nullptr;
 
-  int NumReservedValues = 1;
   Function *function = builder->GetInsertBlock()->getParent();
   BasicBlock *TrueBB = BasicBlock::Create(*context, "truestmt", function);
 
   BasicBlock *FalseBB;
   if (ElseStmt)
-  {
     FalseBB = BasicBlock::Create(*context, "elsestmt");
-    NumReservedValues++;
-  }
+  
 
   BasicBlock *MergeBB = BasicBlock::Create(*context, "endstmt");
 
@@ -622,12 +621,70 @@ Value *IfStmtAST::codegen(driver &drv)
 
   builder->SetInsertPoint(MergeBB);
 
-  PHINode *PN = builder->CreatePHI(Type::getDoubleTy(*context), NumReservedValues, "condval");
+  PHINode *PN = builder->CreatePHI(Type::getDoubleTy(*context), 2, "condval");
   PN->addIncoming(TrueV, TrueBB);
   if (ElseStmt)
     PN->addIncoming(FalseV, FalseBB);
+  else
+    PN->addIncoming(Constant::getNullValue(Type::getDoubleTy(*context)), entryBB);
+
 
   return PN;
 };
 
 /************************* ForStmtAST **************************/
+
+ForStmtAST::ForStmtAST(RootAST* InitExp, ExprAST* CondExpr, AssignmentAST* AssignExpr, StmtAST* BodyStmt) : InitExp(InitExp), CondExpr(CondExpr), AssignExpr(AssignExpr), BodyStmt(BodyStmt){};
+
+Value *ForStmtAST::codegen(driver &drv){
+
+
+  Function *function = builder->GetInsertBlock()->getParent();
+  BasicBlock *CondBB = BasicBlock::Create(*context, "condexp", function);
+  BasicBlock *LoopBB = BasicBlock::Create(*context, "loopstmt");
+  BasicBlock *MergeBB = BasicBlock::Create(*context, "mergestmt");
+
+  builder->SetInsertPoint(CondBB);
+
+  AllocaInst *InitV = InitExp->codegen(drv);
+  if (!InitV)
+    return nullptr;
+  
+
+
+  Value* condV = CondExpr->codegen(drv);
+  if(!condV)
+    return nullptr;
+
+  builder->CreateCondBr(condV, LoopBB, MergeBB);
+
+  CondBB = builder->GetInsertBlock();
+  function->insert(function->end(), LoopBB);
+  builder->SetInsertPoint(LoopBB);
+
+  Value* loopV = BodyStmt->codegen(drv);
+  if(!loopV)
+    return nullptr;
+  
+  Value* assignmentV = AssignExpr->codegen(drv);
+  if(!assignmentV)
+    return nullptr;
+  
+  builder->CreateBr(CondBB);
+  LoopBB = builder->GetInsertBlock();
+  function->insert(function->end(), MergeBB);
+
+  builder->SetInsertPoint(MergeBB);
+  PHINode *PN = builder->CreatePHI(Type::getDoubleTy(*context), 1, "forval");
+  PN->addIncoming(assignmentV, CondBB);
+
+  return PN;
+}
+
+/***
+ * 
+ * 
+ * 
+ * 
+ * 
+*/

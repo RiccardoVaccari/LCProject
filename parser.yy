@@ -25,7 +25,7 @@
   class AssignmentAST;
   class GlobalVarAST;
   class IfStmtAST;
-  // class ForStmtAST;
+  class ForStmtAST;
 }
 
 // The parsing context.
@@ -65,7 +65,7 @@
   GLOBAL     "global"
   IF         "if"
   ELSE       "else"
-  /* FOR        "for" */
+  FOR        "for"
 ;
 
 %token <std::string> IDENTIFIER "id"
@@ -91,7 +91,7 @@
 %type <StmtAST*> stmt
 %type <AssignmentAST*> assignment
 %type <IfStmtAST*> ifstmt
-/* %type <ForStmtAST*> forstmt */
+%type <ForStmtAST*> forstmt
 %type <RootAST*> init
 //non so cosa mettere a init come type perchè può essere
 //binding -> varBinding -> deriva da Root
@@ -146,11 +146,16 @@ stmt:
   assignment            { $$ = $1; }
 | block                 { $$ = $1; }
 | ifstmt                { $$ = $1; } //NEW
-/* | forstmt               { $$ = $1; } //NEW */
+| forstmt               { $$ = $1; } //NEW
 | exp                   { $$ = $1; };
 
 assignment:
- "id" "=" exp           {$$ = new AssignmentAST($1, $3); }; 
+ "id" "=" exp           {$$ = new AssignmentAST($1, $3); } 
+| "+" "+" "id"          {$$ = new AssignmentAST($3,new BinaryExprAST('+',new VariableExprAST($3),new NumberExprAST(1.0)));}   
+//| "id" "+" "+"          {$$ = new AssignmentAST($1,new BinaryExprAST('+',new VariableExprAST($1),new NumberExprAST(1.0)));}
+| "-" "-" "id"          {$$ = new AssignmentAST($3,new BinaryExprAST('-',new VariableExprAST($3),new NumberExprAST(1.0)));};  
+//| "id" "-" "-"          {$$ = new AssignmentAST($1,new BinaryExprAST('-',new VariableExprAST($1),new NumberExprAST(1.0)));};          
+
 
 block:
   "{" stmts "}"             { $$ = new BlockAST($2); }
@@ -210,7 +215,13 @@ ifstmt:
   "if" "(" condexp ")" stmt                          { $$ = new IfStmtAST($3, $5); }
 | "if" "(" condexp ")" stmt "else" stmt              { $$ = new IfStmtAST($3, $5, $7); };
 
-//*******************
+init:
+  binding              { $$ = $1; }
+| assignment           { $$ = $1; }
+
+forstmt:
+  "for" "(" init ";" condexp ";" assignment ")" stmt { $$ = new ForStmtAST($3, $5, $7, $9);};
+
 %%
 
 void

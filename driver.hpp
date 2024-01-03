@@ -218,14 +218,16 @@ public:
   Value *codegen(driver& drv) override;
 };
 
-// class ForStmtAST : public StmtAST {
-//     private:
-//       RootAST* InitExp;
-//       BinaryExprAST* CondExpr;
-//       AssignmentAST* AssignExpr;
-//       StmtAST* BodyStmt;
-//     public: 
-//       ForStmtAST(RootAST* InitExp, BinaryExprAST* CondExpr, AssignmentAST* AssignExpr, StmtAST* BodyStmt);
-// };
+class ForStmtAST : public StmtAST {
+  private:
+    RootAST* InitExp;
+    ExprAST* CondExpr;
+    AssignmentAST* AssignExpr;
+    StmtAST* BodyStmt;
+  public: 
+    ForStmtAST(RootAST* InitExp, ExprAST* CondExpr, AssignmentAST* AssignExpr, StmtAST* BodyStmt);
+    Value *codegen(driver& drv) override;
+};
+///  PN->addIncoming(Constant::getNullValue(Type::getDoubleTy(*context)), BB);
 
 #endif // ! DRIVER_HH
