@@ -1,8 +1,8 @@
 extern printval(x);
-
 def provaFor(n) {
-	for (var i = 1; i<n; ++i) {
-		printval(x)
-   };
-   0.0
+	var i = 2;
+	for (var i = 1; i<10; ++i) {
+		n=n*2
+	};
+	i
 }; 

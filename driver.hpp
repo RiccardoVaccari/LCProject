@@ -54,6 +54,10 @@ public:
 typedef std::variant<std::string,double> lexval;
 const lexval NONE = 0.0;
 
+typedef std::variant<VarBindingAST*,AssignmentAST*> varOp;
+
+
+
 // Classe base dell'intera gerarchia di classi che rappresentano
 // gli elementi del programma
 class RootAST {
@@ -220,14 +224,20 @@ public:
 
 class ForStmtAST : public StmtAST {
   private:
-    RootAST* InitExp;
+    VarOperation* InitExp;
     ExprAST* CondExpr;
     AssignmentAST* AssignExpr;
     StmtAST* BodyStmt;
   public: 
-    ForStmtAST(RootAST* InitExp, ExprAST* CondExpr, AssignmentAST* AssignExpr, StmtAST* BodyStmt);
+    ForStmtAST(VarOperation* InitExp, ExprAST* CondExpr, AssignmentAST* AssignExpr, StmtAST* BodyStmt);
     Value *codegen(driver& drv) override;
 };
-///  PN->addIncoming(Constant::getNullValue(Type::getDoubleTy(*context)), BB);
 
+class VarOperation : RootAST {
+  private:
+    varOp operation;
+  public: 
+    VarOperation(varOp operation);
+    varOp getOp();
+};
 #endif // ! DRIVER_HH

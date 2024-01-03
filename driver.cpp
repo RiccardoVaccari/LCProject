@@ -369,6 +369,7 @@ const std::string &VarBindingAST::getName() const
 
 AllocaInst *VarBindingAST::codegen(driver &drv)
 {
+
   // Viene subito recuperato il riferimento alla funzione in cui si trova
   // il blocco corrente. Il riferimento è necessario perché lo spazio necessario
   // per memorizzare una variabile (ovunque essa sia definita, si tratti cioè
@@ -546,12 +547,13 @@ AssignmentAST::AssignmentAST(std::string Name, ExprAST *AssignExpr) : Name(Name)
 
 Value *AssignmentAST::codegen(driver &drv)
 {
+  //std::cout<<"ASSIGNEMENT"<<std::endl;
   Value *A = drv.NamedValues[Name];
   if (!A)
   {
     A = module->getNamedGlobal(Name);
     if (!A)
-      return LogErrorV("Variabile " + Name + " non definita*");
+      return LogErrorV("Variabile " + Name + " non definita");
   }
 
   Value *RHS = AssignExpr->codegen(drv);
@@ -632,59 +634,92 @@ Value *IfStmtAST::codegen(driver &drv)
   return PN;
 };
 
+
+/*************************Var Operation*****+********************/
+
+VarOperation::VarOperation(varOp operation) : operation(operation) {};
+
+varOp VarOperation::getOp()
+{
+  return operation;
+}
+
 /************************* ForStmtAST **************************/
 
-ForStmtAST::ForStmtAST(RootAST* InitExp, ExprAST* CondExpr, AssignmentAST* AssignExpr, StmtAST* BodyStmt) : InitExp(InitExp), CondExpr(CondExpr), AssignExpr(AssignExpr), BodyStmt(BodyStmt){};
+ForStmtAST::ForStmtAST(VarOperation* InitExp, ExprAST* CondExpr, AssignmentAST* AssignExpr, StmtAST* BodyStmt) : InitExp(InitExp), CondExpr(CondExpr), AssignExpr(AssignExpr), BodyStmt(BodyStmt){};
 
 Value *ForStmtAST::codegen(driver &drv){
 
+  //Setto l'insertPoint dal BB da cui stavo scrivendo prima
+  BasicBlock *entryBB = builder->GetInsertBlock();
+  builder->SetInsertPoint(entryBB);
+  //Generazione codice condizione per init.
+  AllocaInst *tmpAlloca;
+  if(InitExp->getOp().index()){
+    //ASSIGNMENT
+    Value *InitV = std::get<AssignmentAST*>(InitExp->getOp())->codegen(drv);
+    if (!InitV)
+      return nullptr;
+  }
+  else{
+    //VARBINDING
+    AllocaInst *boundVal = std::get<VarBindingAST*>(InitExp->getOp())->codegen(drv);
+    if (!boundVal)
+      return nullptr;
+    tmpAlloca = drv.NamedValues[std::get<VarBindingAST*>(InitExp->getOp())->getName()];
+    drv.NamedValues[std::get<VarBindingAST*>(InitExp->getOp())->getName()] = boundVal;
+  }
+
 
   Function *function = builder->GetInsertBlock()->getParent();
-  BasicBlock *CondBB = BasicBlock::Create(*context, "condexp", function);
+  BasicBlock *CondBB = BasicBlock::Create(*context, "condstmt", function);
   BasicBlock *LoopBB = BasicBlock::Create(*context, "loopstmt");
   BasicBlock *MergeBB = BasicBlock::Create(*context, "mergestmt");
 
+  //Dal blocco in cui sono creo un salto incodizionato verso il blocco
+  //che si occuperà del calcolo della condizione e setto il punto di inserimento. 
+  builder->CreateBr(CondBB);
   builder->SetInsertPoint(CondBB);
 
-  AllocaInst *InitV = InitExp->codegen(drv);
-  if (!InitV)
-    return nullptr;
-  
-
-
+  //Generazione codice condizione per condizione. 
   Value* condV = CondExpr->codegen(drv);
   if(!condV)
     return nullptr;
 
+  //Dopo aver generato il codice creo un salto condizionato. 
+  //vero -> loop body
+  //falso -> mergeBB (esci dal loop)
   builder->CreateCondBr(condV, LoopBB, MergeBB);
 
+  //inserisco il codice per il cpontrollo della condizione
   CondBB = builder->GetInsertBlock();
   function->insert(function->end(), LoopBB);
-  builder->SetInsertPoint(LoopBB);
 
+  //Inizio a scrivere il loop body
+  //generazione del body del loop
+  builder->SetInsertPoint(LoopBB);
   Value* loopV = BodyStmt->codegen(drv);
   if(!loopV)
     return nullptr;
-  
+
+  //generazione del codice per l'assignment
   Value* assignmentV = AssignExpr->codegen(drv);
   if(!assignmentV)
     return nullptr;
-  
+
+  //Salto incodizionato per il controllo della condizione
   builder->CreateBr(CondBB);
+
+  //Inserisco il codice del Merge
   LoopBB = builder->GetInsertBlock();
   function->insert(function->end(), MergeBB);
 
   builder->SetInsertPoint(MergeBB);
   PHINode *PN = builder->CreatePHI(Type::getDoubleTy(*context), 1, "forval");
-  PN->addIncoming(assignmentV, CondBB);
+  PN->addIncoming(Constant::getNullValue(Type::getDoubleTy(*context)), CondBB);
+  
+  if(InitExp->getOp().index() == 0)
+    drv.NamedValues[std::get<VarBindingAST*>(InitExp->getOp())->getName()] = tmpAlloca;
 
   return PN;
 }
-
-/***
- * 
- * 
- * 
- * 
- * 
-*/

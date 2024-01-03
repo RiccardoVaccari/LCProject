@@ -26,6 +26,7 @@
   class GlobalVarAST;
   class IfStmtAST;
   class ForStmtAST;
+  class VarOperation;
 }
 
 // The parsing context.
@@ -92,7 +93,7 @@
 %type <AssignmentAST*> assignment
 %type <IfStmtAST*> ifstmt
 %type <ForStmtAST*> forstmt
-%type <RootAST*> init
+%type <VarOperation*> init
 //non so cosa mettere a init come type perchè può essere
 //binding -> varBinding -> deriva da Root
 //assignment -> Assignment -> deriva da Stmt che deriva da Root
@@ -216,8 +217,8 @@ ifstmt:
 | "if" "(" condexp ")" stmt "else" stmt              { $$ = new IfStmtAST($3, $5, $7); };
 
 init:
-  binding              { $$ = $1; }
-| assignment           { $$ = $1; }
+  binding              { $$ = new VarOperation($1); }
+| assignment           { $$ = new VarOperation($1); };
 
 forstmt:
   "for" "(" init ";" condexp ";" assignment ")" stmt { $$ = new ForStmtAST($3, $5, $7, $9);};
