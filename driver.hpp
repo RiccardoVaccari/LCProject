@@ -200,6 +200,7 @@ class GlobalVarAST : public RootAST {
     GlobalVariable *codegen(driver& drv) override;
 };
 
+//AssignmentAST classe per gli assignment
 class AssignmentAST : public StmtAST {
 private:
   const std::string Name;
@@ -211,7 +212,7 @@ public:
   const std::string& getName() const;
 };
 
-
+//IfStmtAST classe per gli If/Else
 class IfStmtAST : public StmtAST {
 private:
   ExprAST* CondExpr;
@@ -222,6 +223,7 @@ public:
   Value *codegen(driver& drv) override;
 };
 
+//ForStmtAST classe per il For. 
 class ForStmtAST : public StmtAST {
   private:
     VarOperation* InitExp;
@@ -233,6 +235,7 @@ class ForStmtAST : public StmtAST {
     Value *codegen(driver& drv) override;
 };
 
+//Classe che servirà per il FOR poichè come attributo ha una variant che può diventare o un VarBinding o un Assignment. 
 class VarOperation : RootAST {
   private:
     varOp operation;

@@ -653,7 +653,12 @@ Value *ForStmtAST::codegen(driver &drv){
   //Setto l'insertPoint dal BB da cui stavo scrivendo prima
   BasicBlock *entryBB = builder->GetInsertBlock();
   builder->SetInsertPoint(entryBB);
+
   //Generazione codice condizione per init.
+  //Nell'init ci potranno essere due casi: 
+  //-> caso assignement -> InitExp è un assignment -> il suo codgen ritorna un Value
+  //-> caso VarBinding -> InitExp è un varBinding -> il suo codgen ritorna un AllocaInst da usare opportunamente
+  //tmpAlloca è una variabile che servirà per ripristinare lo scope esterno una volta terminato il ciclo. 
   AllocaInst *tmpAlloca;
   if(InitExp->getOp().index()){
     //ASSIGNMENT
@@ -670,7 +675,7 @@ Value *ForStmtAST::codegen(driver &drv){
     drv.NamedValues[std::get<VarBindingAST*>(InitExp->getOp())->getName()] = boundVal;
   }
 
-
+  //Creo i vari BB che serviranno e inserisco, nella funzione padre, quello per il controllo della condizione. 
   Function *function = builder->GetInsertBlock()->getParent();
   BasicBlock *CondBB = BasicBlock::Create(*context, "condstmt", function);
   BasicBlock *LoopBB = BasicBlock::Create(*context, "loopstmt");
@@ -718,6 +723,7 @@ Value *ForStmtAST::codegen(driver &drv){
   PHINode *PN = builder->CreatePHI(Type::getDoubleTy(*context), 1, "forval");
   PN->addIncoming(Constant::getNullValue(Type::getDoubleTy(*context)), CondBB);
   
+  //Ripristino dello scope
   if(InitExp->getOp().index() == 0)
     drv.NamedValues[std::get<VarBindingAST*>(InitExp->getOp())->getName()] = tmpAlloca;
 

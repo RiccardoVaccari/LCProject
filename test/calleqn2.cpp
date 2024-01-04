@@ -1,7 +1,7 @@
 #include <iostream>
 
 extern "C" {
-    double eqn2(double,double);
+    double eqn2(double,double,double);
 }
 
 extern "C" {
@@ -21,9 +21,8 @@ double printval(double x1, double x2, double flag) {
 };
 
 int main() {
-    double a,b;
-    std::cout << "Inserisci a,b: ";
-    std::cin >> a >> b;
-    std::cout << eqn2(a,b) << std::endl;
-    return 0;
+    double a,b,c;
+    std::cout << "Inserisci i coefficienti a,b e c dell'equazione (separati da spazio): ";
+    std::cin >> a >> b >> c;
+    return eqn2(a,b,c);
 }
