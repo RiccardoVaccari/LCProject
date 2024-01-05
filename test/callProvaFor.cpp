@@ -4,6 +4,8 @@ extern "C" {
     double provaFor(double);
 }
 
+
+
 double printval(double x1) {
 	std::cout<<x1<<std::endl;
     return 0.0;

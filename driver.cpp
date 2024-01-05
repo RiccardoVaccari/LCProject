@@ -651,8 +651,8 @@ ForStmtAST::ForStmtAST(VarOperation* InitExp, ExprAST* CondExpr, AssignmentAST* 
 Value *ForStmtAST::codegen(driver &drv){
 
   //Setto l'insertPoint dal BB da cui stavo scrivendo prima
-  BasicBlock *entryBB = builder->GetInsertBlock();
-  builder->SetInsertPoint(entryBB);
+  // BasicBlock *entryBB = builder->GetInsertBlock();
+  // builder->SetInsertPoint(entryBB);
 
   //Generazione codice condizione per init.
   //Nell'init ci potranno essere due casi: 
@@ -668,11 +668,11 @@ Value *ForStmtAST::codegen(driver &drv){
   }
   else{
     //VARBINDING
-    AllocaInst *boundVal = std::get<VarBindingAST*>(InitExp->getOp())->codegen(drv);
-    if (!boundVal)
+    AllocaInst *boundval = std::get<VarBindingAST*>(InitExp->getOp())->codegen(drv);
+    if (!boundval)
       return nullptr;
     tmpAlloca = drv.NamedValues[std::get<VarBindingAST*>(InitExp->getOp())->getName()];
-    drv.NamedValues[std::get<VarBindingAST*>(InitExp->getOp())->getName()] = boundVal;
+    drv.NamedValues[std::get<VarBindingAST*>(InitExp->getOp())->getName()] = boundval;
   }
 
   //Creo i vari BB che serviranno e inserisco, nella funzione padre, quello per il controllo della condizione. 
@@ -696,7 +696,7 @@ Value *ForStmtAST::codegen(driver &drv){
   //falso -> mergeBB (esci dal loop)
   builder->CreateCondBr(condV, LoopBB, MergeBB);
 
-  //inserisco il codice per il cpontrollo della condizione
+  //inserisco il codice per il controllo della condizione
   CondBB = builder->GetInsertBlock();
   function->insert(function->end(), LoopBB);
 
@@ -724,7 +724,7 @@ Value *ForStmtAST::codegen(driver &drv){
   PN->addIncoming(Constant::getNullValue(Type::getDoubleTy(*context)), CondBB);
   
   //Ripristino dello scope
-  if(InitExp->getOp().index() == 0)
+  if(!InitExp->getOp().index())
     drv.NamedValues[std::get<VarBindingAST*>(InitExp->getOp())->getName()] = tmpAlloca;
 
   return PN;
