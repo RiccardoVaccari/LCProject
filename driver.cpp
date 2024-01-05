@@ -137,8 +137,10 @@ BinaryExprAST::BinaryExprAST(char Op, ExprAST *LHS, ExprAST *RHS) : Op(Op), LHS(
 Value *BinaryExprAST::codegen(driver &drv)
 {
   Value *L = LHS->codegen(drv);
-  Value *R = RHS->codegen(drv);
-  if (!L || !R)
+  Value *R;
+  if (RHS)
+    R = RHS->codegen(drv);
+  if (!L || (RHS && !R))
     return nullptr;
   switch (Op)
   {
@@ -156,6 +158,12 @@ Value *BinaryExprAST::codegen(driver &drv)
     return builder->CreateFCmpUGT(L, R, "gttest");
   case '=':
     return builder->CreateFCmpUEQ(L, R, "eqtest");
+  case 'a':
+    return builder->CreateAnd(L, R, "andtest");
+  case 'o':
+    return builder->CreateOr(L, R, "ortest");
+  case 'n':
+    return builder->CreateNot(L, "nottest");
   default:
     std::cout << Op << std::endl;
     return LogErrorV("Operatore binario non supportato");
