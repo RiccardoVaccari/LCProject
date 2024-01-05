@@ -54,6 +54,10 @@ public:
 typedef std::variant<std::string,double> lexval;
 const lexval NONE = 0.0;
 
+typedef std::variant<VarBindingAST*,AssignmentAST*> varOp;
+
+
+
 // Classe base dell'intera gerarchia di classi che rappresentano
 // gli elementi del programma
 class RootAST {
@@ -194,10 +198,9 @@ class GlobalVarAST : public RootAST {
   public:
     GlobalVarAST(const std::string Name);
     GlobalVariable *codegen(driver& drv) override;
-    //Value *codegen(driver& drv) override;
-    // Function *codegen(driver& drv) override;  
 };
 
+//AssignmentAST classe per gli assignment
 class AssignmentAST : public StmtAST {
 private:
   const std::string Name;
@@ -209,6 +212,35 @@ public:
   const std::string& getName() const;
 };
 
-//ciao
+//IfStmtAST classe per gli If/Else
+class IfStmtAST : public StmtAST {
+private:
+  ExprAST* CondExpr;
+  StmtAST* TrueStmt;
+  StmtAST* ElseStmt;
+public: 
+  IfStmtAST(ExprAST* CondExpr, StmtAST* TrueStmt, StmtAST* ElseStmt = nullptr);
+  Value *codegen(driver& drv) override;
+};
 
+//ForStmtAST classe per il For. 
+class ForStmtAST : public StmtAST {
+  private:
+    VarOperation* InitExp;
+    ExprAST* CondExpr;
+    AssignmentAST* AssignExpr;
+    StmtAST* BodyStmt;
+  public: 
+    ForStmtAST(VarOperation* InitExp, ExprAST* CondExpr, AssignmentAST* AssignExpr, StmtAST* BodyStmt);
+    Value *codegen(driver& drv) override;
+};
+
+//Classe che servirà per il FOR poichè come attributo ha una variant che può diventare o un VarBinding o un Assignment. 
+class VarOperation : RootAST {
+  private:
+    varOp operation;
+  public: 
+    VarOperation(varOp operation);
+    varOp getOp();
+};
 #endif // ! DRIVER_HH

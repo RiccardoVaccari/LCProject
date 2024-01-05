@@ -24,6 +24,9 @@
   class StmtAST;
   class AssignmentAST;
   class GlobalVarAST;
+  class IfStmtAST;
+  class ForStmtAST;
+  class VarOperation;
 }
 
 // The parsing context.
@@ -52,6 +55,7 @@
   QMARK	     "?"
   COLON      ":"
   LT         "<"
+  GT         ">"
   EQ         "=="
   ASSIGN     "="
   LBRACE     "{"
@@ -60,6 +64,9 @@
   DEF        "def"
   VAR        "var"
   GLOBAL     "global"
+  IF         "if"
+  ELSE       "else"
+  FOR        "for"
 ;
 
 %token <std::string> IDENTIFIER "id"
@@ -84,6 +91,12 @@
 %type <std::vector<StmtAST*>> stmts
 %type <StmtAST*> stmt
 %type <AssignmentAST*> assignment
+%type <IfStmtAST*> ifstmt
+%type <ForStmtAST*> forstmt
+%type <VarOperation*> init
+//non so cosa mettere a init come type perchè può essere
+//binding -> varBinding -> deriva da Root
+//assignment -> Assignment -> deriva da Stmt che deriva da Root
 
 %%
 %start startsymb;
@@ -119,7 +132,7 @@ idseq:
 | "id" idseq            { $2.insert($2.begin(),$1); $$ = $2; };
 
 %left ":";
-%left "<" "==";
+%left "<" ">" "==";
 %left "+" "-";
 %left "*" "/";
 
@@ -133,13 +146,20 @@ stmts:
 stmt:
   assignment            { $$ = $1; }
 | block                 { $$ = $1; }
+| ifstmt                { $$ = $1; } //NEW
+| forstmt               { $$ = $1; } //NEW
 | exp                   { $$ = $1; };
 
 assignment:
- "id" "=" exp           {$$ = new AssignmentAST($1, $3); }; 
+ "id" "=" exp           {$$ = new AssignmentAST($1, $3); } 
+| "+" "+" "id"          {$$ = new AssignmentAST($3,new BinaryExprAST('+',new VariableExprAST($3),new NumberExprAST(1.0)));}   
+//| "id" "+" "+"          {$$ = new AssignmentAST($1,new BinaryExprAST('+',new VariableExprAST($1),new NumberExprAST(1.0)));}
+| "-" "-" "id"          {$$ = new AssignmentAST($3,new BinaryExprAST('-',new VariableExprAST($3),new NumberExprAST(1.0)));};  
+//| "id" "-" "-"          {$$ = new AssignmentAST($1,new BinaryExprAST('-',new VariableExprAST($1),new NumberExprAST(1.0)));};          
+
 
 block:
-  "{" stmts "}"             { $$ = new BlockAST($2); } //creare un costruttore con un solo pmt
+  "{" stmts "}"             { $$ = new BlockAST($2); }
 | "{" vardefs ";" stmts "}" { $$ = new BlockAST($2,$4); };
 
 vardefs:
@@ -158,6 +178,7 @@ exp:
 | exp "/" exp           { $$ = new BinaryExprAST('/',$1,$3); }
 | idexp                 { $$ = $1; }
 | "(" exp ")"           { $$ = $2; }
+| "-" exp               { $$ = new BinaryExprAST('*',$2, new NumberExprAST(-1.0)); }
 | "number"              { $$ = new NumberExprAST($1); }
 | expif                 { $$ = $1; };
 
@@ -170,6 +191,7 @@ expif:
 
 condexp:
   exp "<" exp           { $$ = new BinaryExprAST('<',$1,$3); }
+| exp ">" exp           { $$ = new BinaryExprAST('>',$1,$3); }
 | exp "==" exp          { $$ = new BinaryExprAST('=',$1,$3); };
 
 idexp:
@@ -188,6 +210,20 @@ explist:
                         }
 | exp "," explist       { $3.insert($3.begin(), $1); $$ = $3; };
  
+//********NEW********
+%right "else" ")";
+
+ifstmt:
+  "if" "(" condexp ")" stmt                          { $$ = new IfStmtAST($3, $5); }
+| "if" "(" condexp ")" stmt "else" stmt              { $$ = new IfStmtAST($3, $5, $7); };
+
+init:
+  binding              { $$ = new VarOperation($1); }
+| assignment           { $$ = new VarOperation($1); };
+
+forstmt:
+  "for" "(" init ";" condexp ";" assignment ")" stmt { $$ = new ForStmtAST($3, $5, $7, $9);};
+
 %%
 
 void

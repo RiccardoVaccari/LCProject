@@ -44,6 +44,7 @@ blank   [ \t]
 "?"      return yy::parser::make_QMARK     (loc);
 ":"      return yy::parser::make_COLON     (loc);
 "<"      return yy::parser::make_LT        (loc);
+">"      return yy::parser::make_GT        (loc);
 "=="     return yy::parser::make_EQ        (loc);
 "="      return yy::parser::make_ASSIGN    (loc);
 "{"      return yy::parser::make_LBRACE    (loc);
@@ -61,6 +62,9 @@ blank   [ \t]
 "extern" { return yy::parser::make_EXTERN(loc); }
 "var"    { return yy::parser::make_VAR(loc); }
 "global" { return yy::parser::make_GLOBAL(loc); }
+"if"     { return yy::parser::make_IF(loc); }
+"else"   { return yy::parser::make_ELSE(loc); }
+"for"    { return yy::parser::make_FOR(loc); }
 
 {id}     { return yy::parser::make_IDENTIFIER (yytext, loc); }
 
