@@ -235,6 +235,16 @@ class ForStmtAST : public StmtAST {
     Value *codegen(driver& drv) override;
 };
 
+//WhileStmt classe per il While. 
+class WhileStmtAST : public StmtAST {
+  private:
+    ExprAST* CondExpr;
+    StmtAST* BodyStmt;
+  public: 
+    WhileStmtAST(ExprAST* CondExpr, StmtAST* BodyStmt);
+    Value *codegen(driver& drv) override;
+};
+
 //Classe che servirà per il FOR poichè come attributo ha una variant che può diventare o un VarBinding o un Assignment. 
 class VarOperation : RootAST {
   private:

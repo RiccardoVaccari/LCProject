@@ -650,7 +650,7 @@ VarOperation::VarOperation(varOp operation) : operation(operation) {};
 varOp VarOperation::getOp()
 {
   return operation;
-}
+};
 
 /************************* ForStmtAST **************************/
 
@@ -736,4 +736,54 @@ Value *ForStmtAST::codegen(driver &drv){
     drv.NamedValues[std::get<VarBindingAST*>(InitExp->getOp())->getName()] = tmpAlloca;
 
   return PN;
-}
+};
+
+/************************* WhileStmtAST **************************/
+
+WhileStmtAST::WhileStmtAST(ExprAST* CondExpr, StmtAST* BodyStmt) : CondExpr(CondExpr), BodyStmt(BodyStmt){};
+
+Value *WhileStmtAST::codegen(driver& drv) {
+  //Creo i vari BB che serviranno e inserisco, nella funzione padre, quello per il controllo della condizione. 
+  Function *function = builder->GetInsertBlock()->getParent();
+  BasicBlock *CondBB = BasicBlock::Create(*context, "condstmt", function);
+  BasicBlock *LoopBB = BasicBlock::Create(*context, "loopstmt");
+  BasicBlock *MergeBB = BasicBlock::Create(*context, "mergestmt");
+
+  //Dal blocco in cui sono creo un salto incodizionato verso il blocco
+  //che si occuperà del calcolo della condizione e setto il punto di inserimento. 
+  builder->CreateBr(CondBB);
+  builder->SetInsertPoint(CondBB);
+
+  //Generazione codice condizione per condizione. 
+  Value* condV = CondExpr->codegen(drv);
+  if(!condV)
+    return nullptr;
+
+  //Dopo aver generato il codice creo un salto condizionato. 
+  //vero -> loop body
+  //falso -> mergeBB (esci dal loop)
+  builder->CreateCondBr(condV, LoopBB, MergeBB);
+
+  //inserisco il codice per il controllo della condizione
+  CondBB = builder->GetInsertBlock();
+  function->insert(function->end(), LoopBB);
+
+  //Inizio a scrivere il loop body
+  //generazione del body del loop
+  builder->SetInsertPoint(LoopBB);
+  Value* loopV = BodyStmt->codegen(drv);
+  if(!loopV)
+    return nullptr;
+
+  //Salto incodizionato per il controllo della condizione
+  builder->CreateBr(CondBB);
+
+  //Inserisco il codice del Merge
+  LoopBB = builder->GetInsertBlock();
+  function->insert(function->end(), MergeBB);
+
+  builder->SetInsertPoint(MergeBB);
+  PHINode *PN = builder->CreatePHI(Type::getDoubleTy(*context), 1, "whileval");
+  PN->addIncoming(Constant::getNullValue(Type::getDoubleTy(*context)), CondBB);
+  return PN;
+};
