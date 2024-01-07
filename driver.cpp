@@ -25,10 +25,10 @@ Value *LogErrorV(const std::string Str)
    interferire con il builder globale, la generazione viene dunque effettuata
    con un builder temporaneo TmpB
 */
-static AllocaInst *CreateEntryBlockAlloca(Function *fun, StringRef VarName)
+static AllocaInst *CreateEntryBlockAlloca(Function *fun, StringRef VarName, Type* T = Type::getDoubleTy(*context))
 {
   IRBuilder<> TmpB(&fun->getEntryBlock(), fun->getEntryBlock().begin());
-  return TmpB.CreateAlloca(Type::getDoubleTy(*context), nullptr, VarName);
+  return TmpB.CreateAlloca(T, nullptr, VarName);
 }
 
 // Implementazione del costruttore della classe driver
@@ -298,7 +298,7 @@ Value *IfExprAST::codegen(driver &drv)
 /********************** Block Expression Tree *********************/
 BlockAST::BlockAST(std::vector<StmtAST *> Stmts) : Stmts(std::move(Stmts)){};
 
-BlockAST::BlockAST(std::vector<VarBindingAST *> Def, std::vector<StmtAST *> Stmts) : Def(std::move(Def)), Stmts(std::move(Stmts)){};
+BlockAST::BlockAST(std::vector<BindingAST *> Def, std::vector<StmtAST *> Stmts) : Def(std::move(Def)), Stmts(std::move(Stmts)){};
 
 Value *BlockAST::codegen(driver &drv)
 {
@@ -395,14 +395,58 @@ AllocaInst *VarBindingAST::codegen(driver &drv)
       return nullptr;
   }
 
-  // Se tutto ok, si genera l'struzione che alloca memoria per la varibile ...
   AllocaInst *Alloca = CreateEntryBlockAlloca(fun, Name);
+  // Se tutto ok, si genera l'struzione che alloca memoria per la varibile ...
   // ... e si genera l'istruzione per memorizzarvi il valore dell'espressione,
   // ovvero il contenuto del registro BoundVal
   if (Val) // Val è nullptr quando ho una definizione senza allocazione (es. Var x invece che Var x = 2)
     builder->CreateStore(BoundVal, Alloca);
   // L'istruzione di allocazione (che include il registro "puntatore" all'area di memoria
   // allocata) viene restituita per essere inserita nella symbol table
+  return Alloca;
+};
+
+/************************* Var binding Tree *************************/
+ArrayBindingAST::ArrayBindingAST(const std::string Name, double Size) : Name(Name), Size(Size){};
+ArrayBindingAST::ArrayBindingAST(const std::string Name, double Size, std::vector<ExprAST *> Values) : Name(Name), Size(Size), Values(std::move(Values)){};
+
+const std::string &ArrayBindingAST::getName() const
+{
+  return Name;
+};
+
+AllocaInst *ArrayBindingAST::codegen(driver &drv)
+{
+  if(!Values.empty() && Values.size() > Size)
+    return nullptr;
+
+  Function *fun = builder->GetInsertBlock()->getParent();
+  ArrayType *AT = ArrayType::get(Type::getDoubleTy(*context), Size);
+  AllocaInst *Alloca = CreateEntryBlockAlloca(fun, Name, AT);
+  
+  std::vector<Value*> boundValues;
+
+  if(!Values.empty()){
+    for(int i=0; i<Size; i++){
+      Value* boundValue;
+      if(i>Values.size())
+        boundValue = Constant::getNullValue(Type::getDoubleTy(*context));
+      else{
+        boundValue = Values[i]->codegen(drv);
+        if(!boundValue)
+          return nullptr;
+      }
+      boundValues.push_back(boundValue);
+    }
+
+    // Foreach value, create the corresponding index as a Value, create a GEP and store.
+    for (int i = 0; i < Size; i++) {
+        Value* index = ConstantInt::get(*context, llvm::APInt(32, i, true));
+        Value* ptr = builder->CreateInBoundsGEP(AT, Alloca, index);
+        builder->CreateStore(boundValues[i], ptr);
+    }
+  }
+
   return Alloca;
 };
 
@@ -555,7 +599,7 @@ AssignmentAST::AssignmentAST(std::string Name, ExprAST *AssignExpr) : Name(Name)
 
 Value *AssignmentAST::codegen(driver &drv)
 {
-  //std::cout<<"ASSIGNEMENT"<<std::endl;
+  // std::cout<<"ASSIGNEMENT"<<std::endl;
   Value *A = drv.NamedValues[Name];
   if (!A)
   {
@@ -594,7 +638,6 @@ Value *IfStmtAST::codegen(driver &drv)
   BasicBlock *FalseBB;
   if (ElseStmt)
     FalseBB = BasicBlock::Create(*context, "elsestmt");
-  
 
   BasicBlock *MergeBB = BasicBlock::Create(*context, "endstmt");
 
@@ -638,14 +681,12 @@ Value *IfStmtAST::codegen(driver &drv)
   else
     PN->addIncoming(Constant::getNullValue(Type::getDoubleTy(*context)), entryBB);
 
-
   return PN;
 };
 
-
 /*************************Var Operation*****+********************/
 
-VarOperation::VarOperation(varOp operation) : operation(operation) {};
+VarOperation::VarOperation(varOp operation) : operation(operation){};
 
 varOp VarOperation::getOp()
 {
@@ -654,131 +695,135 @@ varOp VarOperation::getOp()
 
 /************************* ForStmtAST **************************/
 
-ForStmtAST::ForStmtAST(VarOperation* InitExp, ExprAST* CondExpr, AssignmentAST* AssignExpr, StmtAST* BodyStmt) : InitExp(InitExp), CondExpr(CondExpr), AssignExpr(AssignExpr), BodyStmt(BodyStmt){};
+ForStmtAST::ForStmtAST(VarOperation *InitExp, ExprAST *CondExpr, AssignmentAST *AssignExpr, StmtAST *BodyStmt) : InitExp(InitExp), CondExpr(CondExpr), AssignExpr(AssignExpr), BodyStmt(BodyStmt){};
 
-Value *ForStmtAST::codegen(driver &drv){
+Value *ForStmtAST::codegen(driver &drv)
+{
 
-  //Setto l'insertPoint dal BB da cui stavo scrivendo prima
-  // BasicBlock *entryBB = builder->GetInsertBlock();
-  // builder->SetInsertPoint(entryBB);
+  // Setto l'insertPoint dal BB da cui stavo scrivendo prima
+  //  BasicBlock *entryBB = builder->GetInsertBlock();
+  //  builder->SetInsertPoint(entryBB);
 
-  //Generazione codice condizione per init.
-  //Nell'init ci potranno essere due casi: 
+  // Generazione codice condizione per init.
+  // Nell'init ci potranno essere due casi:
   //-> caso assignement -> InitExp è un assignment -> il suo codgen ritorna un Value
   //-> caso VarBinding -> InitExp è un varBinding -> il suo codgen ritorna un AllocaInst da usare opportunamente
-  //tmpAlloca è una variabile che servirà per ripristinare lo scope esterno una volta terminato il ciclo. 
+  // tmpAlloca è una variabile che servirà per ripristinare lo scope esterno una volta terminato il ciclo.
   AllocaInst *tmpAlloca;
-  if(InitExp->getOp().index()){
-    //ASSIGNMENT
-    Value *InitV = std::get<AssignmentAST*>(InitExp->getOp())->codegen(drv);
+  if (InitExp->getOp().index())
+  {
+    // ASSIGNMENT
+    Value *InitV = std::get<AssignmentAST *>(InitExp->getOp())->codegen(drv);
     if (!InitV)
       return nullptr;
   }
-  else{
-    //VARBINDING
-    AllocaInst *boundval = std::get<VarBindingAST*>(InitExp->getOp())->codegen(drv);
+  else
+  {
+    // VARBINDING
+    AllocaInst *boundval = std::get<BindingAST *>(InitExp->getOp())->codegen(drv);
     if (!boundval)
       return nullptr;
-    tmpAlloca = drv.NamedValues[std::get<VarBindingAST*>(InitExp->getOp())->getName()];
-    drv.NamedValues[std::get<VarBindingAST*>(InitExp->getOp())->getName()] = boundval;
+    tmpAlloca = drv.NamedValues[std::get<BindingAST *>(InitExp->getOp())->getName()];
+    drv.NamedValues[std::get<BindingAST *>(InitExp->getOp())->getName()] = boundval;
   }
 
-  //Creo i vari BB che serviranno e inserisco, nella funzione padre, quello per il controllo della condizione. 
+  // Creo i vari BB che serviranno e inserisco, nella funzione padre, quello per il controllo della condizione.
   Function *function = builder->GetInsertBlock()->getParent();
   BasicBlock *CondBB = BasicBlock::Create(*context, "condstmt", function);
   BasicBlock *LoopBB = BasicBlock::Create(*context, "loopstmt");
   BasicBlock *MergeBB = BasicBlock::Create(*context, "mergestmt");
 
-  //Dal blocco in cui sono creo un salto incodizionato verso il blocco
-  //che si occuperà del calcolo della condizione e setto il punto di inserimento. 
+  // Dal blocco in cui sono creo un salto incodizionato verso il blocco
+  // che si occuperà del calcolo della condizione e setto il punto di inserimento.
   builder->CreateBr(CondBB);
   builder->SetInsertPoint(CondBB);
 
-  //Generazione codice condizione per condizione. 
-  Value* condV = CondExpr->codegen(drv);
-  if(!condV)
+  // Generazione codice condizione per condizione.
+  Value *condV = CondExpr->codegen(drv);
+  if (!condV)
     return nullptr;
 
-  //Dopo aver generato il codice creo un salto condizionato. 
-  //vero -> loop body
-  //falso -> mergeBB (esci dal loop)
+  // Dopo aver generato il codice creo un salto condizionato.
+  // vero -> loop body
+  // falso -> mergeBB (esci dal loop)
   builder->CreateCondBr(condV, LoopBB, MergeBB);
 
-  //inserisco il codice per il controllo della condizione
+  // inserisco il codice per il controllo della condizione
   CondBB = builder->GetInsertBlock();
   function->insert(function->end(), LoopBB);
 
-  //Inizio a scrivere il loop body
-  //generazione del body del loop
+  // Inizio a scrivere il loop body
+  // generazione del body del loop
   builder->SetInsertPoint(LoopBB);
-  Value* loopV = BodyStmt->codegen(drv);
-  if(!loopV)
+  Value *loopV = BodyStmt->codegen(drv);
+  if (!loopV)
     return nullptr;
 
-  //generazione del codice per l'assignment
-  Value* assignmentV = AssignExpr->codegen(drv);
-  if(!assignmentV)
+  // generazione del codice per l'assignment
+  Value *assignmentV = AssignExpr->codegen(drv);
+  if (!assignmentV)
     return nullptr;
 
-  //Salto incodizionato per il controllo della condizione
+  // Salto incodizionato per il controllo della condizione
   builder->CreateBr(CondBB);
 
-  //Inserisco il codice del Merge
+  // Inserisco il codice del Merge
   LoopBB = builder->GetInsertBlock();
   function->insert(function->end(), MergeBB);
 
   builder->SetInsertPoint(MergeBB);
   PHINode *PN = builder->CreatePHI(Type::getDoubleTy(*context), 1, "forval");
   PN->addIncoming(Constant::getNullValue(Type::getDoubleTy(*context)), CondBB);
-  
-  //Ripristino dello scope
-  if(!InitExp->getOp().index())
-    drv.NamedValues[std::get<VarBindingAST*>(InitExp->getOp())->getName()] = tmpAlloca;
+
+  // Ripristino dello scope
+  if (!InitExp->getOp().index())
+    drv.NamedValues[std::get<BindingAST *>(InitExp->getOp())->getName()] = tmpAlloca;
 
   return PN;
 };
 
 /************************* WhileStmtAST **************************/
 
-WhileStmtAST::WhileStmtAST(ExprAST* CondExpr, StmtAST* BodyStmt) : CondExpr(CondExpr), BodyStmt(BodyStmt){};
+WhileStmtAST::WhileStmtAST(ExprAST *CondExpr, StmtAST *BodyStmt) : CondExpr(CondExpr), BodyStmt(BodyStmt){};
 
-Value *WhileStmtAST::codegen(driver& drv) {
-  //Creo i vari BB che serviranno e inserisco, nella funzione padre, quello per il controllo della condizione. 
+Value *WhileStmtAST::codegen(driver &drv)
+{
+  // Creo i vari BB che serviranno e inserisco, nella funzione padre, quello per il controllo della condizione.
   Function *function = builder->GetInsertBlock()->getParent();
   BasicBlock *CondBB = BasicBlock::Create(*context, "condstmt", function);
   BasicBlock *LoopBB = BasicBlock::Create(*context, "loopstmt");
   BasicBlock *MergeBB = BasicBlock::Create(*context, "mergestmt");
 
-  //Dal blocco in cui sono creo un salto incodizionato verso il blocco
-  //che si occuperà del calcolo della condizione e setto il punto di inserimento. 
+  // Dal blocco in cui sono creo un salto incodizionato verso il blocco
+  // che si occuperà del calcolo della condizione e setto il punto di inserimento.
   builder->CreateBr(CondBB);
   builder->SetInsertPoint(CondBB);
 
-  //Generazione codice condizione per condizione. 
-  Value* condV = CondExpr->codegen(drv);
-  if(!condV)
+  // Generazione codice condizione per condizione.
+  Value *condV = CondExpr->codegen(drv);
+  if (!condV)
     return nullptr;
 
-  //Dopo aver generato il codice creo un salto condizionato. 
-  //vero -> loop body
-  //falso -> mergeBB (esci dal loop)
+  // Dopo aver generato il codice creo un salto condizionato.
+  // vero -> loop body
+  // falso -> mergeBB (esci dal loop)
   builder->CreateCondBr(condV, LoopBB, MergeBB);
 
-  //inserisco il codice per il controllo della condizione
+  // inserisco il codice per il controllo della condizione
   CondBB = builder->GetInsertBlock();
   function->insert(function->end(), LoopBB);
 
-  //Inizio a scrivere il loop body
-  //generazione del body del loop
+  // Inizio a scrivere il loop body
+  // generazione del body del loop
   builder->SetInsertPoint(LoopBB);
-  Value* loopV = BodyStmt->codegen(drv);
-  if(!loopV)
+  Value *loopV = BodyStmt->codegen(drv);
+  if (!loopV)
     return nullptr;
 
-  //Salto incodizionato per il controllo della condizione
+  // Salto incodizionato per il controllo della condizione
   builder->CreateBr(CondBB);
 
-  //Inserisco il codice del Merge
+  // Inserisco il codice del Merge
   LoopBB = builder->GetInsertBlock();
   function->insert(function->end(), MergeBB);
 
