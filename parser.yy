@@ -26,6 +26,7 @@
   class GlobalVarAST;
   class IfStmtAST;
   class ForStmtAST;
+  class WhileStmtAST;
   class VarOperation;
 }
 
@@ -67,6 +68,7 @@
   IF         "if"
   ELSE       "else"
   FOR        "for"
+  WHILE      "while"
   AND        "and"
   OR         "or"
   NOT        "not"
@@ -97,6 +99,7 @@
 %type <AssignmentAST*> assignment
 %type <IfStmtAST*> ifstmt
 %type <ForStmtAST*> forstmt
+%type <WhileStmtAST*> whilestmt
 %type <VarOperation*> init
 //non so cosa mettere a init come type perchè può essere
 //binding -> varBinding -> deriva da Root
@@ -152,6 +155,7 @@ stmt:
 | block                 { $$ = $1; }
 | ifstmt                { $$ = $1; }
 | forstmt               { $$ = $1; }
+| whilestmt             { $$ = $1; }
 | exp                   { $$ = $1; };
 
 assignment:
@@ -235,6 +239,9 @@ init:
 
 forstmt:
   "for" "(" init ";" condexp ";" assignment ")" stmt { $$ = new ForStmtAST($3, $5, $7, $9);};
+
+whilestmt:
+  "while" "(" condexp ")" stmt                       { $$ = new WhileStmtAST($3, $5); };
 
 %%
 
