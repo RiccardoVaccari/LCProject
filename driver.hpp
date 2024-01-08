@@ -86,9 +86,12 @@ class ExprAST : public StmtAST {};
 
 /// BindingAST - Classe base per tutti i nodi binding
 class BindingAST : public RootAST {
+protected:
+  std::string Name;
+  void setName(std::string Name);
 public:
   AllocaInst *codegen(driver& drv) { return nullptr; };
-  virtual const std::string& getName() {return nullptr;};
+  const std::string& getName() const;
 };
 
 /// NumberExprAST - Classe per la rappresentazione di costanti numeriche
@@ -137,6 +140,7 @@ public:
   Value *codegen(driver& drv) override;
 };
 
+/// ArrayExprAST - Classe per la rappresentazione di array
 class ArrayExprAST : public ExprAST {
 private:
   const std::string Name;
@@ -172,25 +176,21 @@ public:
 /// VarBindingAST
 class VarBindingAST: public BindingAST {
 private:
-  const std::string Name;
   ExprAST* Val;
 public:
   VarBindingAST(const std::string Name, ExprAST* Val);
   AllocaInst *codegen(driver& drv) override;
-  const std::string& getName() const;
 };
 
 //ArrayBindingAST
 class ArrayBindingAST: public BindingAST {
 private:
-  const std::string Name;
   double Size;
   std::vector<ExprAST*> Values;
 public:
   ArrayBindingAST(const std::string Name, double Size);
   ArrayBindingAST(const std::string Name, double Size, std::vector<ExprAST*> Values);
   AllocaInst *codegen(driver& drv) override;
-  const std::string& getName() const;
 };
 
 /// PrototypeAST - Classe per la rappresentazione dei prototipi di funzione

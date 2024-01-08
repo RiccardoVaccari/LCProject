@@ -25,7 +25,7 @@ Value *LogErrorV(const std::string Str)
    interferire con il builder globale, la generazione viene dunque effettuata
    con un builder temporaneo TmpB
 */
-static AllocaInst *CreateEntryBlockAlloca(Function *fun, StringRef VarName, Type* T = Type::getDoubleTy(*context))
+static AllocaInst *CreateEntryBlockAlloca(Function *fun, StringRef VarName, Type *T = Type::getDoubleTy(*context))
 {
   IRBuilder<> TmpB(&fun->getEntryBlock(), fun->getEntryBlock().begin());
   return TmpB.CreateAlloca(T, nullptr, VarName);
@@ -211,6 +211,13 @@ Value *CallExprAST::codegen(driver &drv)
   return builder->CreateCall(CalleeF, ArgsV, "calltmp");
 }
 
+/************************* Array Expression Tree *************************/
+ArrayExprAST::ArrayExprAST(std::string Name, ExprAST* Offset) : Name(Name), Offset(Offset) {};
+
+Value *ArrayExprAST::codegen(driver& drv){
+  return nullptr;
+};
+
 /************************* If Expression Tree *************************/
 IfExprAST::IfExprAST(ExprAST *Cond, ExprAST *TrueExp, ExprAST *FalseExp) : Cond(Cond), TrueExp(TrueExp), FalseExp(FalseExp){};
 
@@ -367,13 +374,20 @@ Value *BlockAST::codegen(driver &drv)
   return blockvalue;
 };
 
-/************************* Var binding Tree *************************/
-VarBindingAST::VarBindingAST(const std::string Name, ExprAST *Val) : Name(Name), Val(Val){};
+/************************* Binding Tree *************************/
 
-const std::string &VarBindingAST::getName() const
+void BindingAST::setName(std::string Name)
+{
+  Name = Name;
+};
+
+const std::string &BindingAST::getName() const
 {
   return Name;
 };
+
+/************************* Var binding Tree *************************/
+VarBindingAST::VarBindingAST(const std::string Name, ExprAST *Val) : Val(Val) { setName(Name); };
 
 AllocaInst *VarBindingAST::codegen(driver &drv)
 {
@@ -407,43 +421,42 @@ AllocaInst *VarBindingAST::codegen(driver &drv)
 };
 
 /************************* Var binding Tree *************************/
-ArrayBindingAST::ArrayBindingAST(const std::string Name, double Size) : Name(Name), Size(Size){};
-ArrayBindingAST::ArrayBindingAST(const std::string Name, double Size, std::vector<ExprAST *> Values) : Name(Name), Size(Size), Values(std::move(Values)){};
-
-const std::string &ArrayBindingAST::getName() const
-{
-  return Name;
-};
+ArrayBindingAST::ArrayBindingAST(const std::string Name, double Size) : Size(Size) { setName(Name); };
+ArrayBindingAST::ArrayBindingAST(const std::string Name, double Size, std::vector<ExprAST *> Values) : Size(Size), Values(std::move(Values)) { setName(Name); };
 
 AllocaInst *ArrayBindingAST::codegen(driver &drv)
 {
-  if(!Values.empty() && Values.size() > Size)
+  if (!Values.empty() && Values.size() > Size)
     return nullptr;
 
   Function *fun = builder->GetInsertBlock()->getParent();
   ArrayType *AT = ArrayType::get(Type::getDoubleTy(*context), Size);
   AllocaInst *Alloca = CreateEntryBlockAlloca(fun, Name, AT);
-  
-  std::vector<Value*> boundValues;
 
-  if(!Values.empty()){
-    for(int i=0; i<Size; i++){
-      Value* boundValue;
-      if(i>Values.size())
+  std::vector<Value *> boundValues;
+
+  if (!Values.empty())
+  {
+    for (int i = 0; i < Size; i++)
+    {
+      Value *boundValue;
+      if (i > Values.size())
         boundValue = Constant::getNullValue(Type::getDoubleTy(*context));
-      else{
+      else
+      {
         boundValue = Values[i]->codegen(drv);
-        if(!boundValue)
+        if (!boundValue)
           return nullptr;
       }
       boundValues.push_back(boundValue);
     }
 
     // Foreach value, create the corresponding index as a Value, create a GEP and store.
-    for (int i = 0; i < Size; i++) {
-        Value* index = ConstantInt::get(*context, llvm::APInt(32, i, true));
-        Value* ptr = builder->CreateInBoundsGEP(AT, Alloca, index);
-        builder->CreateStore(boundValues[i], ptr);
+    for (int i = 0; i < Size; i++)
+    {
+      Value *index = ConstantInt::get(*context, llvm::APInt(32, i, true));
+      Value *ptr = builder->CreateInBoundsGEP(AT, Alloca, index);
+      builder->CreateStore(boundValues[i], ptr);
     }
   }
 
@@ -596,6 +609,7 @@ GlobalVariable *GlobalVarAST::codegen(driver &drv)
 
 /************************* AssignmentAST **************************/
 AssignmentAST::AssignmentAST(std::string Name, ExprAST *AssignExpr) : Name(Name), AssignExpr(AssignExpr){};
+AssignmentAST::AssignmentAST(std::string Name, ExprAST* OffsetExpr, ExprAST* AssignExpr) : Name(Name), OffsetExpr(OffsetExpr), AssignExpr(AssignExpr) {};
 
 Value *AssignmentAST::codegen(driver &drv)
 {
