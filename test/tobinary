@@ -8,6 +8,6 @@ as -o ${fn}.o ${fn}.s
 
 if [ "$#" -eq 2 ]; then 
 	fn1=${2%.*}
-	clang++ -c $2
-	clang++ -o ${fn} ${fn1}.o ${fn}.o
+	clang++-17 -c $2
+	clang++-17 -o ${fn} ${fn1}.o ${fn}.o
 fi

@@ -54,7 +54,7 @@ public:
 typedef std::variant<std::string,double> lexval;
 const lexval NONE = 0.0;
 
-typedef std::variant<VarBindingAST*,AssignmentAST*> varOp;
+typedef std::variant<BindingAST*,AssignmentAST*> varOp;
 
 
 
@@ -83,6 +83,16 @@ class StmtAST : public RootAST {};
 
 /// ExprAST - Classe base per tutti i nodi espressione
 class ExprAST : public StmtAST {};
+
+/// BindingAST - Classe base per tutti i nodi binding
+class BindingAST : public RootAST {
+protected:
+  std::string Name;
+  void setName(std::string Name);
+public:
+  AllocaInst *codegen(driver& drv) { return nullptr; };
+  std::string getName() const;
+};
 
 /// NumberExprAST - Classe per la rappresentazione di costanti numeriche
 class NumberExprAST : public ExprAST {
@@ -130,6 +140,17 @@ public:
   Value *codegen(driver& drv) override;
 };
 
+/// ArrayExprAST - Classe per la rappresentazione di array
+class ArrayExprAST : public ExprAST {
+private:
+  const std::string Name;
+  ExprAST* Offset;
+
+public:
+  ArrayExprAST(const std::string Name, ExprAST* Offset);
+  Value *codegen(driver& drv) override;
+};
+
 /// IfExprAST
 class IfExprAST : public ExprAST {
 private:
@@ -144,23 +165,32 @@ public:
 /// BlockAST
 class BlockAST : public StmtAST {
 private:
-  std::vector<VarBindingAST*> Def;
+  std::vector<BindingAST*> Def;
   std::vector<StmtAST*> Stmts;
 public:
-  BlockAST(std::vector<VarBindingAST*> Def, std::vector<StmtAST*> Stmts);
+  BlockAST(std::vector<BindingAST*> Def, std::vector<StmtAST*> Stmts);
   BlockAST(std::vector<StmtAST*> Stmts);
   Value *codegen(driver& drv) override;
 }; 
 
 /// VarBindingAST
-class VarBindingAST: public RootAST {
+class VarBindingAST: public BindingAST {
 private:
-  const std::string Name;
   ExprAST* Val;
 public:
   VarBindingAST(const std::string Name, ExprAST* Val);
   AllocaInst *codegen(driver& drv) override;
-  const std::string& getName() const;
+};
+
+//ArrayBindingAST
+class ArrayBindingAST: public BindingAST {
+private:
+  double Size;
+  std::vector<ExprAST*> Values;
+public:
+  ArrayBindingAST(const std::string Name, double Size);
+  ArrayBindingAST(const std::string Name, double Size, std::vector<ExprAST*> Values);
+  AllocaInst *codegen(driver& drv) override;
 };
 
 /// PrototypeAST - Classe per la rappresentazione dei prototipi di funzione
@@ -195,8 +225,10 @@ public:
 class GlobalVarAST : public RootAST {
   private:
     const std::string Name;
+    int Size;
   public:
     GlobalVarAST(const std::string Name);
+    GlobalVarAST(const std::string Name, int Size);
     GlobalVariable *codegen(driver& drv) override;
 };
 
@@ -205,9 +237,11 @@ class AssignmentAST : public StmtAST {
 private:
   const std::string Name;
   ExprAST* AssignExpr;
+  ExprAST* OffsetExpr;
 
 public:
   AssignmentAST(const std::string Name, ExprAST* AssignExpr);
+  AssignmentAST(const std::string Name, ExprAST* OffsetExpr, ExprAST* AssignExpr);
   Value *codegen(driver& drv) override;
   const std::string& getName() const;
 };
@@ -235,7 +269,17 @@ class ForStmtAST : public StmtAST {
     Value *codegen(driver& drv) override;
 };
 
-//Classe che servirà per il FOR poichè come attributo ha una variant che può diventare o un VarBinding o un Assignment. 
+//WhileStmt classe per il While. 
+class WhileStmtAST : public StmtAST {
+  private:
+    ExprAST* CondExpr;
+    StmtAST* BodyStmt;
+  public: 
+    WhileStmtAST(ExprAST* CondExpr, StmtAST* BodyStmt);
+    Value *codegen(driver& drv) override;
+};
+
+//Classe che servirà per il FOR poichè come attributo ha una variant che può diventare o un Binding o un Assignment. 
 class VarOperation : RootAST {
   private:
     varOp operation;

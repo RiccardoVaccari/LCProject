@@ -49,6 +49,8 @@ blank   [ \t]
 "="      return yy::parser::make_ASSIGN    (loc);
 "{"      return yy::parser::make_LBRACE    (loc);
 "}"      return yy::parser::make_RBRACE    (loc);
+"["      return yy::parser::make_LSQBR     (loc);
+"]"      return yy::parser::make_RSQBR     (loc);
 
 {num}    { errno = 0;
            double n = strtod(yytext, NULL);
@@ -65,6 +67,7 @@ blank   [ \t]
 "if"     { return yy::parser::make_IF(loc); }
 "else"   { return yy::parser::make_ELSE(loc); }
 "for"    { return yy::parser::make_FOR(loc); }
+"while"  { return yy::parser::make_WHILE(loc); }
 "and"    { return yy::parser::make_AND(loc); }
 "or"     { return yy::parser::make_OR(loc); }
 "not"    { return yy::parser::make_NOT(loc); }
