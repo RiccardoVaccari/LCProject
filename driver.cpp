@@ -224,17 +224,13 @@ Value *ArrayExprAST::codegen(driver &drv)
   Value *floatIndex = builder->CreateFPTrunc(doubleIndex, Type::getFloatTy(*context));
   Value *intIndex = builder->CreateFPToSI(floatIndex, Type::getInt32Ty(*context));
 
-  AllocaInst *A = drv.NamedValues[Name];
-  Type *AT;
+  Value *A = drv.NamedValues[Name];
   if (!A)
   {
-    GlobalVariable *A = module->getNamedGlobal(Name);
+    A = module->getNamedGlobal(Name);
     if (!A)
       return LogErrorV("Variabile " + Name + " non definita");
-    AT = A->getValueType();
   }
-  else
-    AT = A->getAllocatedType();
 
   Value *p = builder->CreateInBoundsGEP(Type::getDoubleTy(*context), A, intIndex);
   return builder->CreateLoad(Type::getDoubleTy(*context), p, Name.c_str());
@@ -367,7 +363,6 @@ Value *BlockAST::codegen(driver &drv)
       // Viene temporaneamente rimossa la precedente istruzione di allocazione
       // della stessa variabile (nome) e inserita quella corrente
       AllocaTmp.push_back(drv.NamedValues[Def[i]->getName()]);
-      fprintf(stdout, "[ AGGIUNGO ] \t %s \n", Def[i]->getName().c_str());
       drv.NamedValues[Def[i]->getName()] = boundval;
     };
   }
@@ -621,20 +616,25 @@ Function *FunctionAST::codegen(driver &drv)
 GlobalVarAST::GlobalVarAST(const std::string Name) : Name(Name){};
 GlobalVarAST::GlobalVarAST(const std::string Name, int Size) : Name(Name), Size(Size){};
 
-
 GlobalVariable *GlobalVarAST::codegen(driver &drv)
 {
   Type *T;
-  Constant* initValue;
-  if(!Size){
+  Constant *initValue;
+  if (!Size)
+  {
     T = Type::getDoubleTy(*context);
     initValue = ConstantFP::get(Type::getDoubleTy(*context), 0.0);
   }
-  else{
+  else
+  {
     T = ArrayType::get(Type::getDoubleTy(*context), Size);
-    //initValue = ConstantInt::get(*context, APInt(32, 0, true));
-    initValue = nullptr;
+    // initValue = ConstantInt::get(*context, APInt(32, 0, true));
+    //initValue = Constant::getNullValue(Type::getDoubleTy(*context));
+    GlobalVariable *globVar = new GlobalVariable(*module, T, false, GlobalValue::CommonLinkage, ConstantAggregateZero::get(T), Name);
+    globVar->print(errs());
+    fprintf(stderr, "\n");
 
+    return globVar;
   }
   GlobalVariable *globVar = new GlobalVariable(*module, T, false, GlobalValue::CommonLinkage, initValue, Name);
 
@@ -662,7 +662,8 @@ Value *AssignmentAST::codegen(driver &drv)
   if (!RHS)
     return nullptr;
 
-  if(OffsetExpr){
+  if (OffsetExpr)
+  {
     Value *doubleIndex = OffsetExpr->codegen(drv);
     Value *floatIndex = builder->CreateFPTrunc(doubleIndex, Type::getFloatTy(*context));
     Value *intIndex = builder->CreateFPToSI(floatIndex, Type::getInt32Ty(*context));
@@ -671,13 +672,10 @@ Value *AssignmentAST::codegen(driver &drv)
   }
   else
     builder->CreateStore(RHS, A);
-  
-    
-
 
   return RHS;
 }
-// Controllare se serve o meno il getName()
+
 const std::string &AssignmentAST::getName() const
 {
   return Name;
