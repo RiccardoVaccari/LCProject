@@ -212,10 +212,32 @@ Value *CallExprAST::codegen(driver &drv)
 }
 
 /************************* Array Expression Tree *************************/
-ArrayExprAST::ArrayExprAST(std::string Name, ExprAST* Offset) : Name(Name), Offset(Offset) {};
+ArrayExprAST::ArrayExprAST(std::string Name, ExprAST *Offset) : Name(Name), Offset(Offset){};
 
-Value *ArrayExprAST::codegen(driver& drv){
-  return nullptr;
+Value *ArrayExprAST::codegen(driver &drv)
+{
+
+  Value *doubleIndex = Offset->codegen(drv);
+  if (!doubleIndex)
+    return nullptr;
+
+  Value *floatIndex = builder->CreateFPTrunc(doubleIndex, Type::getFloatTy(*context));
+  Value *intIndex = builder->CreateFPToSI(floatIndex, Type::getInt32Ty(*context));
+
+  AllocaInst *A = drv.NamedValues[Name];
+  Type *AT;
+  if (!A)
+  {
+    GlobalVariable *A = module->getNamedGlobal(Name);
+    if (!A)
+      return LogErrorV("Variabile " + Name + " non definita");
+    AT = A->getValueType();
+  }
+  else
+    AT = A->getAllocatedType();
+
+  Value *p = builder->CreateInBoundsGEP(Type::getDoubleTy(*context), A, intIndex);
+  return builder->CreateLoad(Type::getDoubleTy(*context), p, Name.c_str());
 };
 
 /************************* If Expression Tree *************************/
@@ -345,6 +367,7 @@ Value *BlockAST::codegen(driver &drv)
       // Viene temporaneamente rimossa la precedente istruzione di allocazione
       // della stessa variabile (nome) e inserita quella corrente
       AllocaTmp.push_back(drv.NamedValues[Def[i]->getName()]);
+      fprintf(stdout, "[ AGGIUNGO ] \t %s \n", Def[i]->getName().c_str());
       drv.NamedValues[Def[i]->getName()] = boundval;
     };
   }
@@ -378,16 +401,16 @@ Value *BlockAST::codegen(driver &drv)
 
 void BindingAST::setName(std::string Name)
 {
-  Name = Name;
+  this->Name = Name;
 };
 
-const std::string &BindingAST::getName() const
+std::string BindingAST::getName() const
 {
   return Name;
 };
 
 /************************* Var binding Tree *************************/
-VarBindingAST::VarBindingAST(const std::string Name, ExprAST *Val) : Val(Val) { setName(Name); };
+VarBindingAST::VarBindingAST(std::string Name, ExprAST *Val) : Val(Val) { setName(Name); };
 
 AllocaInst *VarBindingAST::codegen(driver &drv)
 {
@@ -421,8 +444,8 @@ AllocaInst *VarBindingAST::codegen(driver &drv)
 };
 
 /************************* Var binding Tree *************************/
-ArrayBindingAST::ArrayBindingAST(const std::string Name, double Size) : Size(Size) { setName(Name); };
-ArrayBindingAST::ArrayBindingAST(const std::string Name, double Size, std::vector<ExprAST *> Values) : Size(Size), Values(std::move(Values)) { setName(Name); };
+ArrayBindingAST::ArrayBindingAST(std::string Name, double Size) : Size(Size) { setName(Name); };
+ArrayBindingAST::ArrayBindingAST(std::string Name, double Size, std::vector<ExprAST *> Values) : Size(Size), Values(std::move(Values)) { setName(Name); };
 
 AllocaInst *ArrayBindingAST::codegen(driver &drv)
 {
@@ -451,12 +474,12 @@ AllocaInst *ArrayBindingAST::codegen(driver &drv)
       boundValues.push_back(boundValue);
     }
 
-    // Foreach value, create the corresponding index as a Value, create a GEP and store.
+    // Per ogni valore, si crea il corrispondente index come Value*, si ottiene il rispettivo GEP e si effettua la Store.
     for (int i = 0; i < Size; i++)
     {
-      Value *index = ConstantInt::get(*context, llvm::APInt(32, i, true));
-      Value *ptr = builder->CreateInBoundsGEP(AT, Alloca, index);
-      builder->CreateStore(boundValues[i], ptr);
+      Value *index = ConstantInt::get(*context, APInt(32, i, true));
+      Value *p = builder->CreateInBoundsGEP(Type::getDoubleTy(*context), Alloca, index);
+      builder->CreateStore(boundValues[i], p);
     }
   }
 
@@ -609,7 +632,7 @@ GlobalVariable *GlobalVarAST::codegen(driver &drv)
 
 /************************* AssignmentAST **************************/
 AssignmentAST::AssignmentAST(std::string Name, ExprAST *AssignExpr) : Name(Name), AssignExpr(AssignExpr){};
-AssignmentAST::AssignmentAST(std::string Name, ExprAST* OffsetExpr, ExprAST* AssignExpr) : Name(Name), OffsetExpr(OffsetExpr), AssignExpr(AssignExpr) {};
+AssignmentAST::AssignmentAST(std::string Name, ExprAST *OffsetExpr, ExprAST *AssignExpr) : Name(Name), OffsetExpr(OffsetExpr), AssignExpr(AssignExpr){};
 
 Value *AssignmentAST::codegen(driver &drv)
 {

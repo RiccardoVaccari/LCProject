@@ -91,7 +91,7 @@ protected:
   void setName(std::string Name);
 public:
   AllocaInst *codegen(driver& drv) { return nullptr; };
-  const std::string& getName() const;
+  std::string getName() const;
 };
 
 /// NumberExprAST - Classe per la rappresentazione di costanti numeriche
