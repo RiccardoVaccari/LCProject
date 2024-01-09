@@ -225,8 +225,10 @@ public:
 class GlobalVarAST : public RootAST {
   private:
     const std::string Name;
+    int Size;
   public:
     GlobalVarAST(const std::string Name);
+    GlobalVarAST(const std::string Name, int Size);
     GlobalVariable *codegen(driver& drv) override;
 };
 

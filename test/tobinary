@@ -2,8 +2,8 @@
 
 fn=${1%.*}
 
-llvm-as-17 $1
-llc-17 ${fn}.bc
+llvm-as $1
+llc ${fn}.bc
 as -o ${fn}.o ${fn}.s
 
 if [ "$#" -eq 2 ]; then 

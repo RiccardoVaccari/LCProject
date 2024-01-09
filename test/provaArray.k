@@ -1,4 +1,6 @@
+global V[3];
+
 def provaArray() {
-	var V[4] = {5.4, 3.14, 3.50, 4.28};
-	V[4]
+	var x = 1;
+	x
 };

@@ -106,9 +106,6 @@
 %type <ForStmtAST*> forstmt
 %type <WhileStmtAST*> whilestmt
 %type <VarOperation*> init
-//non so cosa mettere a init come type perchè può essere
-//binding -> varBinding -> deriva da Root
-//assignment -> Assignment -> deriva da Stmt che deriva da Root
 
 %%
 %start startsymb;
@@ -136,7 +133,8 @@ proto:
   "id" "(" idseq ")"    { $$ = new PrototypeAST($1,$3);  };
 
 globalvar:
-  "global" "id"         { $$ = new GlobalVarAST($2); }; 
+  "global" "id"                   { $$ = new GlobalVarAST($2); }
+| "global" "id" "[" "number" "]"  { $$ = new GlobalVarAST($2, $4); };
 
 idseq:
   %empty                { std::vector<std::string> args;

@@ -20,3 +20,5 @@ scanner*
 !scanner.ll
 
 *.o
+
+!test/tobinary

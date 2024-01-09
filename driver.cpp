@@ -463,7 +463,7 @@ AllocaInst *ArrayBindingAST::codegen(driver &drv)
     for (int i = 0; i < Size; i++)
     {
       Value *boundValue;
-      if (i > Values.size())
+      if (i >= Values.size())
         boundValue = Constant::getNullValue(Type::getDoubleTy(*context));
       else
       {
@@ -619,11 +619,25 @@ Function *FunctionAST::codegen(driver &drv)
 
 /************************* GlobalVarAST **************************/
 GlobalVarAST::GlobalVarAST(const std::string Name) : Name(Name){};
+GlobalVarAST::GlobalVarAST(const std::string Name, int Size) : Name(Name), Size(Size){};
+
 
 GlobalVariable *GlobalVarAST::codegen(driver &drv)
 {
+  Type *T;
+  Constant* initValue;
+  if(!Size){
+    T = Type::getDoubleTy(*context);
+    initValue = ConstantFP::get(Type::getDoubleTy(*context), 0.0);
+  }
+  else{
+    T = ArrayType::get(Type::getDoubleTy(*context), Size);
+    //initValue = ConstantInt::get(*context, APInt(32, 0, true));
+    initValue = nullptr;
 
-  GlobalVariable *globVar = new GlobalVariable(*module, Type::getDoubleTy(*context), false, GlobalValue::CommonLinkage, ConstantFP::get(Type::getDoubleTy(*context), 0.0), Name);
+  }
+  GlobalVariable *globVar = new GlobalVariable(*module, T, false, GlobalValue::CommonLinkage, initValue, Name);
+
   globVar->print(errs());
   fprintf(stderr, "\n");
 
@@ -636,7 +650,6 @@ AssignmentAST::AssignmentAST(std::string Name, ExprAST *OffsetExpr, ExprAST *Ass
 
 Value *AssignmentAST::codegen(driver &drv)
 {
-  // std::cout<<"ASSIGNEMENT"<<std::endl;
   Value *A = drv.NamedValues[Name];
   if (!A)
   {
@@ -649,7 +662,19 @@ Value *AssignmentAST::codegen(driver &drv)
   if (!RHS)
     return nullptr;
 
-  builder->CreateStore(RHS, A);
+  if(OffsetExpr){
+    Value *doubleIndex = OffsetExpr->codegen(drv);
+    Value *floatIndex = builder->CreateFPTrunc(doubleIndex, Type::getFloatTy(*context));
+    Value *intIndex = builder->CreateFPToSI(floatIndex, Type::getInt32Ty(*context));
+    Value *p = builder->CreateInBoundsGEP(Type::getDoubleTy(*context), A, intIndex);
+    builder->CreateStore(RHS, p);
+  }
+  else
+    builder->CreateStore(RHS, A);
+  
+    
+
+
   return RHS;
 }
 // Controllare se serve o meno il getName()
