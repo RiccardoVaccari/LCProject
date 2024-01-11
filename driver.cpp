@@ -832,14 +832,12 @@ Value *ForStmtAST::codegen(driver &drv)
   function->insert(function->end(), MergeBB);
 
   builder->SetInsertPoint(MergeBB);
-  PHINode *PN = builder->CreatePHI(Type::getDoubleTy(*context), 1, "forval");
-  PN->addIncoming(Constant::getNullValue(Type::getDoubleTy(*context)), CondBB);
 
   // Ripristino dello scope
   if (!InitExp->getOp().index())
     drv.NamedValues[std::get<BindingAST *>(InitExp->getOp())->getName()] = tmpAlloca;
 
-  return PN;
+  return Constant::getNullValue(Type::getDoubleTy(*context));
 };
 
 /************************* WhileStmtAST **************************/
@@ -888,7 +886,53 @@ Value *WhileStmtAST::codegen(driver &drv)
   function->insert(function->end(), MergeBB);
 
   builder->SetInsertPoint(MergeBB);
-  PHINode *PN = builder->CreatePHI(Type::getDoubleTy(*context), 1, "whileval");
-  PN->addIncoming(Constant::getNullValue(Type::getDoubleTy(*context)), CondBB);
-  return PN;
+  return Constant::getNullValue(Type::getDoubleTy(*context));
+};
+
+/************************* DoWhileStmtAST **************************/
+
+DoWhileStmtAST::DoWhileStmtAST(StmtAST *BodyStmt, ExprAST *CondExpr) : BodyStmt(BodyStmt), CondExpr(CondExpr){};
+
+Value *DoWhileStmtAST::codegen(driver &drv)
+{
+  // Creo i vari BB che serviranno e inserisco, nella funzione padre, quello per il controllo della condizione.
+  Function *function = builder->GetInsertBlock()->getParent();
+  BasicBlock *LoopBB = BasicBlock::Create(*context, "loopstmt", function);
+  BasicBlock *CondBB = BasicBlock::Create(*context, "condstmt");
+  BasicBlock *MergeBB = BasicBlock::Create(*context, "mergestmt");
+
+  // salto incodizionato verso il body
+  builder->CreateBr(LoopBB);
+
+  // Inizio a scrivere il loop body
+  builder->SetInsertPoint(LoopBB);
+  Value *loopV = BodyStmt->codegen(drv);
+  if (!loopV)
+    return nullptr;
+  
+  //Inserico il BB dedicato al controllo della condizione
+  LoopBB = builder->GetInsertBlock();
+  function->insert(function->end(), CondBB);
+
+  // Dal blocco in cui sono creo un salto incodizionato verso il blocco
+  // che si occuperà del calcolo della condizione e setto il punto di inserimento.
+  builder->CreateBr(CondBB);
+  
+  // Generazione codice condizione per condizione.
+  builder->SetInsertPoint(CondBB);
+  Value *condV = CondExpr->codegen(drv);
+  if (!condV)
+    return nullptr;
+
+  // Dopo aver generato il codice creo un salto condizionato.
+  // vero -> loop body
+  // falso -> mergeBB (esci dal loop)
+  builder->CreateCondBr(condV, LoopBB, MergeBB);
+
+  // Inserisco il codice del Merge
+  CondBB = builder->GetInsertBlock();
+  function->insert(function->end(), MergeBB);
+
+  builder->SetInsertPoint(MergeBB);
+  return Constant::getNullValue(Type::getDoubleTy(*context));
 };

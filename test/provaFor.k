@@ -1,7 +1,13 @@
 extern printval(x);
 def provaFor(n) {
-	var a = 1;
-	for(var i = 1; i<n; ++i){
-		a = 2*a
+	var i = 0;
+	do{
+		printval(i);
+		++i
+	}while(i<n);
+
+	while(i>0){
+		printval(i);
+		--i
 	}
-}; 
+};

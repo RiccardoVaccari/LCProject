@@ -46,6 +46,8 @@ blank   [ \t]
 "<"      return yy::parser::make_LT        (loc);
 ">"      return yy::parser::make_GT        (loc);
 "=="     return yy::parser::make_EQ        (loc);
+"--"     return yy::parser::make_DEC       (loc);
+"++"     return yy::parser::make_INC       (loc);
 "="      return yy::parser::make_ASSIGN    (loc);
 "{"      return yy::parser::make_LBRACE    (loc);
 "}"      return yy::parser::make_RBRACE    (loc);
@@ -71,6 +73,9 @@ blank   [ \t]
 "and"    { return yy::parser::make_AND(loc); }
 "or"     { return yy::parser::make_OR(loc); }
 "not"    { return yy::parser::make_NOT(loc); }
+"do"     { return yy::parser::make_DO(loc); }
+"in"     { return yy::parser::make_IN(loc); }
+
 
 {id}     { return yy::parser::make_IDENTIFIER (yytext, loc); }
 

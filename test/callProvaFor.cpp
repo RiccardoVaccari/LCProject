@@ -5,6 +5,9 @@ extern "C" {
 }
 
 
+extern "C" {
+    double printval(double);
+}
 
 double printval(double x1) {
 	std::cout<<x1<<std::endl;
@@ -16,5 +19,6 @@ int main() {
     double x;
     std::cout << "Inserisci il valore di x: ";
     std::cin >> x;
-    std::cout << "provaFor(" << x << ") = " << provaFor(x) << std::endl;
+    provaFor(x);
+    // std::cout << "provaFor(" << x << ") = " << provaFor(x) << std::endl;
 }

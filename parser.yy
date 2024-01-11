@@ -1,5 +1,6 @@
 %skeleton "lalr1.cc" /* -*- C++ -*- */
 %require "3.2"
+
 %defines
 
 %define api.token.constructor
@@ -27,8 +28,7 @@
   class AssignmentAST;
   class GlobalVarAST;
   class IfStmtAST;
-  class ForStmtAST;
-  class WhileStmtAST;
+  class LoopAST;
   class VarOperation;
   class ArrayExprAST;
 }
@@ -56,6 +56,8 @@
   SLASH      "/"
   LPAREN     "("
   RPAREN     ")"
+  INC        "++"
+  DEC        "--"
   QMARK	     "?"
   COLON      ":"
   LT         "<"
@@ -77,6 +79,8 @@
   AND        "and"
   OR         "or"
   NOT        "not"
+  DO         "do"
+  IN         "in"
 ;
 
 %token <std::string> IDENTIFIER "id"
@@ -103,8 +107,7 @@
 %type <StmtAST*> stmt
 %type <AssignmentAST*> assignment
 %type <IfStmtAST*> ifstmt
-%type <ForStmtAST*> forstmt
-%type <WhileStmtAST*> whilestmt
+%type <LoopAST*> loopstmt
 %type <VarOperation*> init
 
 %%
@@ -141,10 +144,14 @@ idseq:
                          $$ = args; }
 | "id" idseq            { $2.insert($2.begin(),$1); $$ = $2; };
 
+
 %left ":";
+%left "and" "or";
+%left "not";
 %left "<" ">" "==";
 %left "+" "-";
 %left "*" "/";
+%left "--" "++";
 
 stmts:
   stmt                  { std::vector<StmtAST*> statements;
@@ -157,17 +164,17 @@ stmt:
   assignment            { $$ = $1; }
 | block                 { $$ = $1; }
 | ifstmt                { $$ = $1; }
-| forstmt               { $$ = $1; }
-| whilestmt             { $$ = $1; }
+| loopstmt              { $$ = $1; }
 | exp                   { $$ = $1; };
 
+
 assignment:
- "id" "=" exp               { $$ = new AssignmentAST($1, $3); } 
-| "+" "+" "id"              { $$ = new AssignmentAST($3,new BinaryExprAST('+',new VariableExprAST($3),new NumberExprAST(1.0)));}   
-//| "id" "+" "+"            { $$ = new AssignmentAST($1,new BinaryExprAST('+',new VariableExprAST($1),new NumberExprAST(1.0)));}
-| "-" "-" "id"              { $$ = new AssignmentAST($3,new BinaryExprAST('-',new VariableExprAST($3),new NumberExprAST(1.0)));}
-//| "id" "-" "-"            { $$ = new AssignmentAST($1,new BinaryExprAST('-',new VariableExprAST($1),new NumberExprAST(1.0)));};          
-| "id" "[" exp "]" "=" exp  { $$ = new AssignmentAST($1,$3,$6); }; //NEW
+ "id" "=" exp            { $$ = new AssignmentAST($1, $3); } 
+| "++" "id"              { $$ = new AssignmentAST($2,new BinaryExprAST('+',new VariableExprAST($2),new NumberExprAST(1.0)));}   
+//| "id" "++"            { $$ = new AssignmentAST($1,new BinaryExprAST('+',new VariableExprAST($1),new NumberExprAST(1.0)));}
+| "--" "id"              { $$ = new AssignmentAST($2,new BinaryExprAST('-',new VariableExprAST($2),new NumberExprAST(1.0)));}
+//| "id" "--"            { $$ = new AssignmentAST($1,new BinaryExprAST('-',new VariableExprAST($1),new NumberExprAST(1.0)));}          
+| "id" "[" exp "]" "=" exp  { $$ = new AssignmentAST($1,$3,$6); };
 
 
 block:
@@ -199,6 +206,8 @@ exp:
 initexp: 
   %empty                { $$ = nullptr; }
 | "=" exp               { $$ = $2; };
+
+%right "?";
 
 expif:
   condexp "?" exp ":" exp { $$ = new IfExprAST($1,$3,$5); };
@@ -242,11 +251,11 @@ init:
   binding              { $$ = new VarOperation($1); }
 | assignment           { $$ = new VarOperation($1); };
 
-forstmt:
-  "for" "(" init ";" condexp ";" assignment ")" stmt { $$ = new ForStmtAST($3, $5, $7, $9);};
-
-whilestmt:
-  "while" "(" condexp ")" stmt                       { $$ = new WhileStmtAST($3, $5); };
+loopstmt:
+  "for" "(" init ";" condexp ";" assignment ")" stmt { $$ = new ForStmtAST($3, $5, $7, $9); }
+| "while" "(" condexp ")" stmt                       { $$ = new WhileStmtAST($3, $5); }
+| "do" stmt "while" "(" condexp ")"                  { $$ = new DoWhileStmtAST($2, $5); };
+//| "for" "(" "id" "in" "id" ")"                     { $$ = new ForEachStmtAST($3, $5); };
 
 %%
 

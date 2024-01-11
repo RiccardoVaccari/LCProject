@@ -84,6 +84,9 @@ class StmtAST : public RootAST {};
 /// ExprAST - Classe base per tutti i nodi espressione
 class ExprAST : public StmtAST {};
 
+/// LoopAST - Classe base per tutti i nodi loop (For, While, DoWhile)
+class LoopAST : public StmtAST {};
+
 /// BindingAST - Classe base per tutti i nodi binding
 class BindingAST : public RootAST {
 protected:
@@ -258,7 +261,7 @@ public:
 };
 
 //ForStmtAST classe per il For. 
-class ForStmtAST : public StmtAST {
+class ForStmtAST : public LoopAST {
   private:
     VarOperation* InitExp;
     ExprAST* CondExpr;
@@ -270,12 +273,22 @@ class ForStmtAST : public StmtAST {
 };
 
 //WhileStmt classe per il While. 
-class WhileStmtAST : public StmtAST {
+class WhileStmtAST : public LoopAST {
   private:
     ExprAST* CondExpr;
     StmtAST* BodyStmt;
   public: 
     WhileStmtAST(ExprAST* CondExpr, StmtAST* BodyStmt);
+    Value *codegen(driver& drv) override;
+};
+
+//DoWhileStmt per il Do While
+class DoWhileStmtAST : public LoopAST {
+  private:
+    ExprAST* CondExpr;
+    StmtAST* BodyStmt;
+  public: 
+    DoWhileStmtAST(StmtAST* BodyStmt, ExprAST* CondExpr);
     Value *codegen(driver& drv) override;
 };
 

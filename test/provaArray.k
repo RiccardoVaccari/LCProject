@@ -1,27 +1,8 @@
 
 extern printval(x);
-global V[5];
 
 def provaArray(y) {
-	var size = 10;
-	var V[10];
-	var i = 0;
-	
-	for(var i = 0; i < size;++i){
-		V[i] = y + i
-	};
-
-	while(i < size){
-		printval(V[i]);
-		++i
-	};
-	0
+	var V[4] = {1.2,3.2,5.1,3.4};
+	V[4]
 };
 
-def provaArray2(){
-	V[6] = 1;
-	for(var i = 0; i < 7; ++i){
-		printval(V[i])
-	};
-	0
-};
