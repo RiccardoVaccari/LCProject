@@ -1,9 +1,8 @@
-global V[4];
-
 extern printval(x);
 
 def provaArray(y) {
-	V[3] = 2;
-	V[2]
+	var V[5] = {1,2,3,4,5};
+	for (i in V)
+		printval(i)
 };
 
