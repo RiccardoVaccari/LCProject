@@ -292,6 +292,16 @@ class DoWhileStmtAST : public LoopAST {
     Value *codegen(driver& drv) override;
 };
 
+class ForEachStmtAST : public LoopAST {
+  private:
+    const std::string VarId;
+    const std::string VectorId;
+    StmtAST* BodyStmt;
+  public: 
+    ForEachStmtAST( const std::string VarId, const std::string VectorId, StmtAST* BodyStmt);
+    Value *codegen(driver& drv) override;
+};
+
 //Classe che servirà per il FOR poichè come attributo ha una variant che può diventare o un Binding o un Assignment. 
 class VarOperation : RootAST {
   private:

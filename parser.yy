@@ -254,8 +254,8 @@ init:
 loopstmt:
   "for" "(" init ";" condexp ";" assignment ")" stmt { $$ = new ForStmtAST($3, $5, $7, $9); }
 | "while" "(" condexp ")" stmt                       { $$ = new WhileStmtAST($3, $5); }
-| "do" stmt "while" "(" condexp ")"                  { $$ = new DoWhileStmtAST($2, $5); };
-//| "for" "(" "id" "in" "id" ")"                     { $$ = new ForEachStmtAST($3, $5); };
+| "do" stmt "while" "(" condexp ")"                  { $$ = new DoWhileStmtAST($2, $5); }
+| "for" "(" "id" "in" "id" ")" stmt                  { $$ = new ForEachStmtAST($3, $5, $7); };
 
 %%
 

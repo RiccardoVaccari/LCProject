@@ -622,22 +622,17 @@ GlobalVariable *GlobalVarAST::codegen(driver &drv)
   Constant *initValue;
   if (!Size)
   {
-    T = Type::getDoubleTy(*context);
-    initValue = ConstantFP::get(Type::getDoubleTy(*context), 0.0);
+    //Caso Variabile  
+    T = Type::getDoubleTy(*context);                               //tipo double
+    initValue = ConstantFP::get(Type::getDoubleTy(*context), 0.0); //valore iniziale a 0
   }
   else
   {
-    T = ArrayType::get(Type::getDoubleTy(*context), Size);
-    // initValue = ConstantInt::get(*context, APInt(32, 0, true));
-    //initValue = Constant::getNullValue(Type::getDoubleTy(*context));
-    GlobalVariable *globVar = new GlobalVariable(*module, T, false, GlobalValue::CommonLinkage, ConstantAggregateZero::get(T), Name);
-    globVar->print(errs());
-    fprintf(stderr, "\n");
-
-    return globVar;
+    //Caso Array
+    T = ArrayType::get(Type::getDoubleTy(*context), Size); //tipo per l'array
+    initValue = ConstantAggregateZero::get(T);             //valore iniziale che pone a 0 tutti gli elementi dell'array
   }
   GlobalVariable *globVar = new GlobalVariable(*module, T, false, GlobalValue::CommonLinkage, initValue, Name);
-
   globVar->print(errs());
   fprintf(stderr, "\n");
 
@@ -650,20 +645,27 @@ AssignmentAST::AssignmentAST(std::string Name, ExprAST *OffsetExpr, ExprAST *Ass
 
 Value *AssignmentAST::codegen(driver &drv)
 {
+  //Recupero dalla symbol table la variabile su cui si cerca di effettuare un assegnamento
   Value *A = drv.NamedValues[Name];
   if (!A)
   {
     A = module->getNamedGlobal(Name);
     if (!A)
+      //Se non è definita nè nella symbol table nè globalmente allora restituirò errore
       return LogErrorV("Variabile " + Name + " non definita");
   }
 
+  //Calcolo del RHS
   Value *RHS = AssignExpr->codegen(drv);
   if (!RHS)
     return nullptr;
 
+  //Controllo che sia stato definito un offset,
+  //Se è stato definito vuol dire che si sta 
+  //tentando di effettuare un assignment su una cella di un Array
   if (OffsetExpr)
   {
+    //Calcolo l'offset, lo converto a intero, mediante CreateInBoundGep creo un riferimento e infine memorizzo l'RHS nel riferimento trovato
     Value *doubleIndex = OffsetExpr->codegen(drv);
     Value *floatIndex = builder->CreateFPTrunc(doubleIndex, Type::getFloatTy(*context));
     Value *intIndex = builder->CreateFPToSI(floatIndex, Type::getInt32Ty(*context));
@@ -671,6 +673,7 @@ Value *AssignmentAST::codegen(driver &drv)
     builder->CreateStore(RHS, p);
   }
   else
+    //semplice memorizzazione dell'RHS nel riferimento alla variabile
     builder->CreateStore(RHS, A);
 
   return RHS;
@@ -685,13 +688,18 @@ const std::string &AssignmentAST::getName() const
 IfStmtAST::IfStmtAST(ExprAST *CondExpr, StmtAST *TrueStmt, StmtAST *ElseStmt) : CondExpr(CondExpr), TrueStmt(TrueStmt), ElseStmt(ElseStmt){};
 
 Value *IfStmtAST::codegen(driver &drv)
-{
+{ 
+  //Recupero il basicBB in cui si stava scrivendo precedentemente 
+  //per motivi legati al PhiNode finale (dopo spiegazione)
   BasicBlock *entryBB = builder->GetInsertBlock();
 
+  //Viene generato il codice per il controllo della condizione
   Value *CondV = CondExpr->codegen(drv);
   if (!CondV)
     return nullptr;
-
+  
+  //vengono creati i tre BB ma allocato solo uno
+  //TrueBB (allocato), FalseBB (presente solo se c'è un ramo else) e MergeBB
   Function *function = builder->GetInsertBlock()->getParent();
   BasicBlock *TrueBB = BasicBlock::Create(*context, "truestmt", function);
 
@@ -701,44 +709,59 @@ Value *IfStmtAST::codegen(driver &drv)
 
   BasicBlock *MergeBB = BasicBlock::Create(*context, "endstmt");
 
+  //Ramo Else presente -> salto a TrueBB se la condizione è vera, a FalseBB altrimenti
+  //Ramo Else NON presente -> salto a TrueBB se la condizione è vera, a MergeBB (fine) altrimenti
   if (ElseStmt)
     builder->CreateCondBr(CondV, TrueBB, FalseBB);
   else
     builder->CreateCondBr(CondV, TrueBB, MergeBB);
 
+  //Genero il codice per il TrueBB
   builder->SetInsertPoint(TrueBB);
   Value *TrueV = TrueStmt->codegen(drv);
   if (!TrueV)
     return nullptr;
+  
+  //Salto incodizionato vero il merge
   builder->CreateBr(MergeBB);
 
+  //Ramo Else presente -> inserisco il FalseBB dopo il TrueBB
+  //Ramo Else NON presente -> inserisco il MergeBB dopo il TrueBB
   TrueBB = builder->GetInsertBlock();
   if (ElseStmt)
     function->insert(function->end(), FalseBB);
   else
     function->insert(function->end(), MergeBB);
 
+  //Se è presente il ramo Else...
   Value *FalseV;
   if (ElseStmt)
   {
+    //Setto correttamente il punto di scrittura del builder...
     builder->SetInsertPoint(FalseBB);
-
+    //e genero la condizione. 
     FalseV = ElseStmt->codegen(drv);
     if (!FalseV)
       return nullptr;
     builder->CreateBr(MergeBB);
 
+    //Inserisco il mergeBB dopo il falseBB
     FalseBB = builder->GetInsertBlock();
     function->insert(function->end(), MergeBB);
   }
 
   builder->SetInsertPoint(MergeBB);
 
+  //Nel PhiNode (nel mergeBB)...
   PHINode *PN = builder->CreatePHI(Type::getDoubleTy(*context), 2, "condval");
+  //Se si arriva dal TrueBB ci sarà il rispettivo Value.
   PN->addIncoming(TrueV, TrueBB);
+  //Bisogna controllare che esista il ramo Else poichè:
   if (ElseStmt)
+    //Se esiste allora, se la condizione è risultata falsa, arrivo dal FalseBB e ci sarà il rispettivo Value
     PN->addIncoming(FalseV, FalseBB);
   else
+    //Se non esiste allora, se la condizione è risultata falsa, arrivo dall'entryBB (ciò da cui scrivevo prima) e ci sarà 0 come Value
     PN->addIncoming(Constant::getNullValue(Type::getDoubleTy(*context)), entryBB);
 
   return PN;
@@ -936,3 +959,10 @@ Value *DoWhileStmtAST::codegen(driver &drv)
   builder->SetInsertPoint(MergeBB);
   return Constant::getNullValue(Type::getDoubleTy(*context));
 };
+
+/*************************** ForEachStmtASt *********************+*/
+
+ForEachStmtAST::ForEachStmtAST(const std::string VarId, const std::string VectorId, StmtAST* BodyStmt) : VarId(VarId), VectorId(VectorId), BodyStmt(BodyStmt) {};
+Value *ForEachStmtAST::codegen(driver &drbv){
+  
+}
