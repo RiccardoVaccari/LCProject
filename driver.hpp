@@ -294,11 +294,12 @@ class DoWhileStmtAST : public LoopAST {
 
 class ForEachStmtAST : public LoopAST {
   private:
-    const std::string VarId;
-    const std::string VectorId;
+    const std::string IterName;
+    const std::string ArrayName;
     StmtAST* BodyStmt;
+    std::string getCounterName() const;
   public: 
-    ForEachStmtAST( const std::string VarId, const std::string VectorId, StmtAST* BodyStmt);
+    ForEachStmtAST( const std::string IterName, const std::string ArrayName, StmtAST* BodyStmt);
     Value *codegen(driver& drv) override;
 };
 

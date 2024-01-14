@@ -17,6 +17,6 @@ int main() {
     double x;
     std::cout << "Inserisci il valore di x: ";
     std::cin >> x;
-    std::cout << "provaArray() = " << provaArray(x) << std::endl;
+    std::cout << "provaArray() "<<std::endl<< provaArray(x) << std::endl;
 
 }

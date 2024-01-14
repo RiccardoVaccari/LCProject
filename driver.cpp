@@ -632,6 +632,7 @@ GlobalVariable *GlobalVarAST::codegen(driver &drv)
     T = ArrayType::get(Type::getDoubleTy(*context), Size); // tipo per l'array
     initValue = ConstantAggregateZero::get(T);             // valore iniziale che pone a 0 tutti gli elementi dell'array
   }
+
   GlobalVariable *globVar = new GlobalVariable(*module, T, false, GlobalValue::CommonLinkage, initValue, Name);
   globVar->print(errs());
   fprintf(stderr, "\n");
@@ -961,66 +962,106 @@ Value *DoWhileStmtAST::codegen(driver &drv)
 
 /*************************** ForEachStmtASt *********************+*/
 
-ForEachStmtAST::ForEachStmtAST(const std::string VarId, const std::string VectorId, StmtAST *BodyStmt) : VarId(VarId), VectorId(VectorId), BodyStmt(BodyStmt){};
+ForEachStmtAST::ForEachStmtAST(const std::string IterName, const std::string ArrayName, StmtAST *BodyStmt) : IterName(IterName), ArrayName(ArrayName), BodyStmt(BodyStmt){};
+
+std::string ForEachStmtAST::getCounterName() const {
+  return IterName + "_counter";
+}
 
 Value *ForEachStmtAST::codegen(driver &drv)
 {
+  //Vengono creati tre BB dedicati al controllo della condizione, body del loop e fine del loop. 
   builder->SetInsertPoint(builder->GetInsertBlock());
-  VarBindingAST *counter = new VarBindingAST(VarId + "_counter", new NumberExprAST(0.0));
-  AllocaInst *tmpAlloca = drv.NamedValues[VarId + "_counter"];
+  Function *function = builder->GetInsertBlock()->getParent();
+  BasicBlock *CondBB = BasicBlock::Create(*context, "condstmt", function);
+  BasicBlock *LoopBB = BasicBlock::Create(*context, "loopstmt");
+  BasicBlock *MergeBB = BasicBlock::Create(*context, "mergestmt");
   
+  // Nel raro caso in cui sia presente una altra variabile con lo stesso nome del Counter occorre
+  // preservare lo scope. 
+  AllocaInst *tmpCounter = drv.NamedValues[getCounterName()];
+  //Si crea una nuova variabile contatore che terrà traccia dell'offset raggiunto volta per volta. 
+  VarBindingAST *counter = new VarBindingAST(getCounterName(), new NumberExprAST(0.0));
+
+  // Viene generato il boundVal del Counter e assegnamento nella Symbol Table. 
   AllocaInst *boundValCounter = counter->codegen(drv);
   if(!counter)
     return nullptr;
-  drv.NamedValues[VarId + "_counter"] = boundValCounter;
+  drv.NamedValues[getCounterName()] = boundValCounter;
 
-  Function *function = builder->GetInsertBlock()->getParent();
-  BasicBlock *LoopBB = BasicBlock::Create(*context, "loopstmt", function);
-  BasicBlock *MergeBB = BasicBlock::Create(*context, "mergestmt");
-  
-  builder->CreateBr(LoopBB);
-  builder->SetInsertPoint(LoopBB);
-  
-  AllocaInst *A = drv.NamedValues[VectorId];
-  if (!A)
-    return LogErrorV("Variabile " + VectorId + " non definita.");
-
-  Type *AT = A->getAllocatedType();
+  //Si controlla che ArrayName faccia effettivamente riferimento ad un Array (già allocato)
+  AllocaInst *A = drv.NamedValues[ArrayName];
+  Type *AT;
+  if (!A){
+    GlobalVariable *A = module->getNamedGlobal(ArrayName);
+    if (!A)
+      return LogErrorV("Variabile " + ArrayName + " non definita.");
+    AT = A->getValueType();
+  } else{
+    AT = A->getAllocatedType();
+  }
   if (!AT->isArrayTy())
   {
-    return LogErrorV("La variabile " + VectorId + " non è un array.");
+    return LogErrorV("La variabile " + ArrayName + " non è un array.");
   }
-  
+  // La dimensione dell'array è necessaria per capire quando fermare il ciclo. 
   int ArraySize = AT->getArrayNumElements();
 
-  VarBindingAST *var = new VarBindingAST(VarId, new ArrayExprAST(VectorId, new VariableExprAST(VarId + "_counter")));
-
-  AllocaInst *bindingValue = var->codegen(drv);
-  if (!bindingValue)
-    return nullptr;
-  drv.NamedValues[VarId] = bindingValue;
-
-  Value *BodyValue = BodyStmt->codegen(drv);
-  if (!BodyValue)
-    return nullptr;
-
-  AssignmentAST *updateCounter = new AssignmentAST(VarId + "_counter", new BinaryExprAST('+', new VariableExprAST(VarId + "_counter"), new NumberExprAST(1.0)));
-  updateCounter->codegen(drv);
-  if (!updateCounter)
-    return nullptr;
-
-  BinaryExprAST *CondExpr = new BinaryExprAST('<', new VariableExprAST(VarId + "_counter"), new NumberExprAST(ArraySize));
+  // Alla fine del BB da cui stavo scrivendo prima creo un salto 
+  //incodizionato verso il condBB e setto il punto di scrittura. 
+  builder->CreateBr(CondBB);
+  builder->SetInsertPoint(CondBB);
+  
+  // La condizione di salto sarà dettata da una espressione binaria in cui si controlla 
+  // che il counter sia minore della dimensione dell'array.
+  BinaryExprAST *CondExpr = new BinaryExprAST('<', new VariableExprAST(getCounterName()), new NumberExprAST(ArraySize));
   Value *condV = CondExpr->codegen(drv);
   if (!condV)
     return nullptr;
   
+  // Se il counter è minore della dimensione si salta al LoopBB, altrimenti si esce. 
   builder->CreateCondBr(condV, LoopBB, MergeBB);
 
+  //Si inserisce correttamente il LoopBB e si setta il punto di scrittura
+  CondBB = builder->GetInsertBlock();
+  function->insert(function->end(), LoopBB);
+  builder->SetInsertPoint(LoopBB);
+
+  // Si preserva lo scope nel caso in cui ci sia 
+  // un'altra variabile con lo stesso nome dell'iteratore. 
+  AllocaInst *tmpIter = drv.NamedValues[IterName];
+
+  // Si crea un binding tra l'iteratore e Array[counter] 
+  // ossia la cella dell'array a cui l'iteratore è arrivato.  
+  VarBindingAST *var = new VarBindingAST(IterName, new ArrayExprAST(ArrayName, new VariableExprAST(getCounterName())));
+  AllocaInst *bindingValue = var->codegen(drv);
+  if (!bindingValue)
+    return nullptr;
+  drv.NamedValues[IterName] = bindingValue;
+
+  // Si genera il codice del Body. 
+  Value *BodyValue = BodyStmt->codegen(drv);
+  if (!BodyValue)
+    return nullptr;
+
+  // Si incrementa il contatore. 
+  AssignmentAST *updateCounter = new AssignmentAST(getCounterName(), new BinaryExprAST('+', new VariableExprAST(getCounterName()), new NumberExprAST(1.0)));
+  updateCounter->codegen(drv);
+  if (!updateCounter)
+    return nullptr;
+
+  //Si crea un salto incodizionato verso CondBB
   LoopBB = builder->GetInsertBlock();
+  builder->CreateBr(CondBB);
+
+  // Viene inserito alla fine il MergeBB. 
   function->insert(function->end(), MergeBB);
   builder->SetInsertPoint(MergeBB);
   
-  drv.NamedValues[VarId + "_counter"] = tmpAlloca;
+  // Ripristinato lo scope. 
+  drv.NamedValues[getCounterName()] = tmpCounter;
+  drv.NamedValues[IterName] = tmpIter; 
 
+  // Si ritorna 0. 
   return Constant::getNullValue(Type::getDoubleTy(*context));
 };
